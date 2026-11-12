@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex">
+<title>내 앱</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="head">
+    <h1>내 앱</h1>
+    <p class="sub">Supabase 모드 예제: 사람마다 로그인하고, 자기 메모만 보고 고칩니다.</p>
+  </header>
+
+  <!-- 로그인 전 -->
+  <section class="panel" id="authPanel" hidden>
+    <div class="panel-head"><h2>로그인</h2></div>
+    <form class="stack" id="authForm">
+      <div class="field"><label for="email">이메일</label><input id="email" type="email" autocomplete="email" required></div>
+      <div class="field"><label for="password">비밀번호 (6자 이상)</label><input id="password" type="password" autocomplete="current-password" minlength="6" required></div>
+      <div class="row">
+        <button class="primary" type="submit" data-act="signin">로그인</button>
+        <button type="submit" data-act="signup">처음이에요, 가입</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- 로그인 후 -->
+  <section class="panel" id="notesPanel" hidden>
+    <div class="panel-head"><h2>내 메모</h2><button class="linkbtn" id="signOut" type="button">로그아웃</button></div>
+    <p class="hint" id="who"></p>
+    <form class="row" id="addForm">
+      <label class="sr" for="body">새 메모</label>
+      <input id="body" maxlength="2000" placeholder="메모를 적고 추가" required>
+      <button class="primary" type="submit">추가</button>
+    </form>
+    <ul class="list" id="list"></ul>
+  </section>
+
+  <footer class="foot"><span class="hint" id="status" role="status" aria-live="polite">불러오는 중</span></footer>
+</div>
+<!-- Supabase 공식 브라우저 라이브러리(@supabase/supabase-js, npm에서 받아 저장소에 넣은 파일). CDN을 쓰지 않는다. -->
+<script src="vendor-supabase.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

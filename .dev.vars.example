@@ -1,0 +1,2 @@
+# 로컬 개발용 편집 암호. 이 파일을 .dev.vars로 복사해 쓴다(.dev.vars는 커밋하지 않는다).
+WRITE_TOKEN=local-test-token
