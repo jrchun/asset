@@ -1,4 +1,10 @@
-# 프로젝트 규칙 (새 프로젝트 시작 틀)
+# 프로젝트 규칙 — 내 리밸런싱 보드 (새 프로젝트 시작 틀 기반)
+
+이 앱: 그룹별 목표 비중 리밸런싱 도구(1인용). 기획 원본은 jrchun/portfolio의 `docs/requests/001-rebalance-board-mvp.md`, `docs/DESIGN.md`, `reference/rebalance-board.html`.
+- 계산은 `web/js/rebalance.js`의 순수 함수에만 둔다(Worker도 가져다 쓴다). 바꾸면 `tests/rebalance.test.js`의 테스트 벡터(요청서 6장 경우 1)를 확인한다.
+- 가격 수집은 `src/prices/`(시장별 출처는 `sources.js`), 매일 예약 작업(`src/jobs.js`)과 `POST /api/prices/refresh`가 부른다. 증권사 API·키가 필요한 출처는 쓰지 않는다.
+- 주문 기능은 만들지 않는다. 화면의 세금 문구는 안내용이며 계산에 넣지 않는다.
+
 
 사용자는 개발 지식이 많지 않다. 답변은 한국어로, 전문 용어는 쉽게 풀어서 쓴다.
 
