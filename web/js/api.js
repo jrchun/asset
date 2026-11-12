@@ -1,7 +1,7 @@
 // 서버 통신. 같은 출처의 /api 만 호출한다.
 // 읽기는 누구나, 저장은 편집 암호가 있어야 한다. 암호는 이 기기 브라우저에만 저장한다.
 
-const TOKEN_KEY = 'app-write-token';
+const TOKEN_KEY = 'rebalance-write-token';
 export function getToken() { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
 export function setToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) { /* 저장 공간이 없으면 이번 화면에서만 쓴다 */ } }
 const auth = () => { const t = getToken(); return t ? { Authorization: 'Bearer ' + t } : {}; };
@@ -24,3 +24,26 @@ export async function putDoc(doc, version) {
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return { ok: true, ...(await res.json()) };
 }
+
+export async function getPrices() {
+  const res = await fetch('/api/prices', { cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+// 쓰기 요청 공통: 401 → { unauthorized }, 409 → { conflict, doc, version }, 그 밖의 오류 → { error: 문구 }
+async function post(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth() },
+    body: JSON.stringify(body || {}),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (res.status === 401) return { ok: false, unauthorized: true };
+  if (res.status === 409) return { ok: false, conflict: true, ...j };
+  if (!res.ok) return { ok: false, error: j.detail || ('HTTP ' + res.status) };
+  return { ok: true, ...j };
+}
+export const refreshPrices = () => post('/api/prices/refresh');
+export const applyTrades = body => post('/api/trades/apply', body);
+export const undoTrades = batch => post('/api/trades/undo', { batch });

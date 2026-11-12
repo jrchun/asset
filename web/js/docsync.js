@@ -21,7 +21,7 @@ export function createDocSync({ render, status, needToken, delay = 700 }) {
     if (!doc) return;
     mutate(doc);
     status('저장 대기 중…');
-    clearTimeout(timer); timer = setTimeout(flush, delay);
+    clearTimeout(timer); timer = setTimeout(() => { timer = null; flush(); }, delay);
   }
 
   async function flush() {
@@ -36,7 +36,7 @@ export function createDocSync({ render, status, needToken, delay = 700 }) {
         needToken();
         return;
       } else {
-        clearTimeout(timer); again = false;
+        clearTimeout(timer); timer = null; again = false;
         doc = r.doc; version = r.version;
         render(doc, { replaced: true, force: true });
         status('다른 기기에서 수정돼 새로 불러왔습니다');
@@ -50,5 +50,19 @@ export function createDocSync({ render, status, needToken, delay = 700 }) {
 
   function setToken(t) { api.setToken(t); status('저장 중…'); flush(); }
 
-  return { load, edit, flush, setToken, get doc() { return doc; } };
+  // 서버가 다른 경로(체결 반영·되돌리기)로 문서를 바꿨을 때 그 결과로 바꿔 끼운다.
+  function replace(nextDoc, nextVersion) {
+    clearTimeout(timer); timer = null; again = false;
+    doc = nextDoc; version = nextVersion;
+    render(doc, { replaced: true, force: true });
+  }
+  // 저장 대기 중인 수정이 있으면 지금 저장하고 끝날 때까지 기다린다.
+  async function settle() {
+    for (let i = 0; i < 50 && (timer || saving); i++) {
+      if (timer) { clearTimeout(timer); timer = null; await flush(); }
+      else await new Promise(r => setTimeout(r, 100));
+    }
+  }
+
+  return { load, edit, flush, setToken, replace, settle, get doc() { return doc; }, get version() { return version; } };
 }

@@ -5,17 +5,30 @@
 // 예약 작업(매일 등)은 src/jobs.js. 시각은 wrangler.toml의 [triggers] crons.
 import * as doc from './api/doc.js';
 import * as health from './api/health.js';
+import * as prices from './api/prices.js';
+import * as refresh from './api/refresh.js';
+import * as trades from './api/trades.js';
+import * as snapshots from './api/snapshots.js';
 import { json } from './lib/http.js';
 import { runScheduled } from './jobs.js';
 
-const ROUTES = { '/api/doc': doc, '/api/health': health };
+// /api/doc 이 포트폴리오 문서다(불러오기·자동 저장·409 충돌은 web/js/docsync.js).
+const ROUTES = {
+  '/api/doc': doc,
+  '/api/health': health,
+  '/api/prices': prices,
+  '/api/prices/refresh': refresh,
+  '/api/trades': { GET: trades.GET },
+  '/api/trades/apply': { POST: trades.apply },
+  '/api/trades/undo': { POST: trades.undo },
+  '/api/snapshots': snapshots,
+};
 
 export default {
   async fetch(request, env, ctx) {
     const path = new URL(request.url).pathname.replace(/\/+$/, '');
     const route = ROUTES[path];
-    // Supabase 모드(D1 없음)에서는 /api/doc을 쓰지 않는다.
-    if (!route || (route === doc && !env.DB)) return env.ASSETS.fetch(request);
+    if (!route || (route !== health && !env.DB)) return env.ASSETS.fetch(request);
     const handler = route[request.method];
     if (!handler) return json({ detail: '허용하지 않는 요청 방식입니다.' }, 405);
     try {
