@@ -1,7 +1,7 @@
 # Cloudflare Worker 설정(이 파일이 기준이다). name은 대시보드의 Worker 이름과 같아야 한다.
 # name, database_name, database_id는 scripts/cf_mcp.mjs fill(또는 wrangler d1 create 출력)로 채운다.
 # 편집 암호(WRITE_TOKEN)는 비밀값이라 여기 두지 않는다: 대시보드 > Worker > 설정 > 변수 및 비밀 > Secret.
-name = "my-app"
+name = "rebalance"
 main = "./src/worker.js"
 compatibility_date = "2026-11-01"
 send_metrics = false
@@ -13,8 +13,8 @@ binding = "ASSETS"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "my-app"
-database_id = "__D1_DATABASE_ID__"
+database_name = "rebalance"
+database_id = "c8d41855-6216-4b9b-8e02-98e703c69d85"
 
 # 예약 작업(src/jobs.js). UTC 기준: 매일 07:30 KST. 무료 플랜은 계정 전체에서 Cron Trigger 5개까지다.
 [triggers]
