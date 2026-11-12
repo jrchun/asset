@@ -33,7 +33,7 @@ Cloudflare·Supabase 연결은 MCP(브라우저 로그인)로 한다. **API 토�
 
 ## 작업 흐름
 1. 고친 뒤 `npm test`(node + python 테스트)와 로컬 실행(`npx wrangler@4 dev`, 편집 암호는 `.dev.vars`)으로 확인한다.
-2. `main`에 올리면 Cloudflare(Workers Builds)가 자동 배포한다. Git 연결 전 첫 배포만 `cf_mcp.mjs deploy`를 MCP로 실행한다. 배포 뒤 **반드시** `node scripts/check_site.mjs <사이트 주소>`로 실제 사이트를 확인하고, 화면은 브라우저로 폰 폭에서 본다. "배포했습니다"로 끝내지 않는다.
+2. 고친 것은 PR로 올리고, `npm test` 통과와 화면 확인이 끝나면 **AI가 직접 Merge한다**(사용자가 미리 허락함. 사용자가 "합치기 전에 보여 줘"라고 했거나 데이터를 지우거나 바꾸는 변경이면 PR 링크를 주고 기다린다). `main`에 들어가면 Cloudflare(Workers Builds)가 1~2분 안에 자동 배포한다(이 앱은 이미 연결돼 있다). 배포 뒤 **반드시** `node scripts/check_site.mjs <사이트 주소>`로 실제 사이트를 확인하고, 화면은 브라우저로 폰 폭에서 본다. "배포했습니다"로 끝내지 않는다.
 3. 사람에게 맡겨야 하는 일(Git 연결, 편집 암호, Supabase 설정 클릭)은 `docs/AGENT_SETUP.md`·`docs/SETUP.md`의 해당 줄과 함정을 그대로 안내한다.
 
 ## 실행
