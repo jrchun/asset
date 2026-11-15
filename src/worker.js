@@ -34,11 +34,15 @@ export default {
     try {
       return await handler({ request, env, ctx });
     } catch (e) {
-      return json({ detail: '서버 오류: ' + (e && e.message || e) }, 500);
+      console.error('API 오류', path, e); // 자세한 내용은 대시보드 › Worker › 로그에서 본다
+      return json({ detail: '서버 오류가 났습니다. 잠시 후 다시 시도해 주세요.' }, 500);
     }
   },
   // Cron Trigger. 결과와 오류는 대시보드 › Worker › 로그에서 본다.
   async scheduled(controller, env, ctx) {
-    ctx.waitUntil(runScheduled(env).then(note => console.log('예약 작업 완료:', note)));
+    ctx.waitUntil(runScheduled(env).then(
+      note => console.log('예약 작업 완료:', note),
+      e => { console.error('예약 작업 실패:', e); throw e; }, // 다시 던져야 대시보드에 실패로 표시된다
+    ));
   },
 };

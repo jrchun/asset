@@ -11,6 +11,7 @@ import { loadDoc } from '../prices/collect.js';
 import { localParts } from '../prices/sources.js';
 
 const KINDS = ['monthly', 'annual', 'manual'];
+const MAX_TRADES = 100; // 한 번에 반영하는 체결 수 상한(한 번의 D1 batch에 넣는 문장 수를 제한)
 const GUARD = '(SELECT version FROM doc WHERE id = 1) = ? AND (SELECT body FROM doc WHERE id = 1) = ?';
 
 async function readJson(request) {
@@ -27,6 +28,7 @@ export async function apply({ request, env }) {
   if (!canWrite(request, env)) return json({ detail: '편집 암호가 필요합니다.' }, 401);
   const body = await readJson(request);
   if (!body || !Number.isInteger(body.version) || !Array.isArray(body.trades)) return json({ detail: '{version, kind, trades} 형식이어야 합니다.' }, 422);
+  if (body.trades.length > MAX_TRADES) return json({ detail: `한 번에 ${MAX_TRADES}건까지 반영할 수 있습니다.` }, 422);
   const kind = KINDS.includes(body.kind) ? body.kind : 'manual';
   const cur = await loadDoc(env);
   if (cur.version === 0) return json({ detail: '포트폴리오가 아직 저장되지 않았습니다. 값을 하나 고쳐 저장한 뒤 다시 해 주세요.' }, 422);

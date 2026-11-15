@@ -26,7 +26,7 @@ create policy "내 메모 고치기" on public.notes for update to authenticated
 drop policy if exists "내 메모 지우기" on public.notes;
 create policy "내 메모 지우기" on public.notes for delete to authenticated using (owner = (select auth.uid()));
 
--- 잠들기 방지: 무료 플랜은 7일간 요청이 없으면 멈춘다. 매일 작업(.github/workflows/supabase-keepalive.yml)이
+-- 잠들기 방지: 무료 플랜은 7일간 요청이 없으면 멈춘다. Worker의 매일 예약 작업(src/jobs.js)이
 -- 공개 키로 이 함수를 부른다. 아무 데이터도 읽거나 쓰지 않는다.
 create or replace function public.keepalive() returns integer
 language sql stable security invoker set search_path = '' as $$ select 1 $$;
