@@ -53,3 +53,29 @@ test('허용하지 않는 요청 방식은 405', async () => {
   assert.equal((await worker.fetch(req('/api/doc', { method: 'DELETE' }), e)).status, 405);
   assert.equal((await worker.fetch(req('/api/trades/apply'), e)).status, 405);
 });
+
+test('문서 크기는 바이트로 잰다(한글은 글자당 3바이트)', async () => {
+  const e = env();
+  const big = '가'.repeat(90 * 1024); // 글자 수는 한도(256K)보다 작지만 바이트는 넘는다
+  assert.equal((await put(e, { doc: { big }, version: 0 }, 'secret')).status, 413);
+});
+
+test('서버 오류는 안내 문구만 보여 주고 내부 내용은 감춘다', async () => {
+  const e = { WRITE_TOKEN: 'secret', DB: { prepare: () => { throw new Error('비밀 내부 정보'); } }, ASSETS: { fetch: async () => new Response('') } };
+  const errs = []; const orig = console.error; console.error = (...a) => errs.push(a);
+  try {
+    const r = await worker.fetch(req('/api/doc'), e);
+    assert.equal(r.status, 500);
+    assert.doesNotMatch(await r.text(), /비밀 내부 정보/);
+    assert.ok(errs.length > 0);
+  } finally { console.error = orig; }
+});
+
+test('체결은 한 번에 100건까지만 반영한다', async () => {
+  const e = env();
+  await put(e, { doc: { assets: [] }, version: 0 }, 'secret');
+  const trades = Array.from({ length: 101 }, () => ({ ticker: 'X', side: 'buy', qty: 1, price: 1 }));
+  const r = await worker.fetch(req('/api/trades/apply', { method: 'POST', headers: { Authorization: 'Bearer secret', 'Content-Type': 'application/json' }, body: JSON.stringify({ version: 1, kind: 'manual', trades }) }), e);
+  assert.equal(r.status, 422);
+  assert.match((await r.json()).detail, /100건/);
+});

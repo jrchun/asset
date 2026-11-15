@@ -20,7 +20,7 @@ Cloudflare·Supabase 연결은 MCP(브라우저 로그인)로 한다. **API 토�
 - `src/worker.js`: `/api/*`만 처리. 새 API는 `src/api/<이름>.js`에 `GET/PUT/POST/DELETE`를 만들고 `ROUTES`에 추가.
 - `src/jobs.js`: 예약 작업(매일 등). `wrangler.toml`의 `[triggers] crons`(UTC) 시각에 Worker 안에서 돈다. 토큰·GitHub Actions 없음. 무료 플랜은 계정 전체 Cron 5개.
 - `db/schema.sql`: D1 스키마(`CREATE TABLE IF NOT EXISTS`만). 바꾸면 `node scripts/cf_mcp.mjs prepare`로 만든 코드를 Cloudflare MCP `execute`로 실행해 적용.
-- `scripts/cf_mcp.mjs`: Cloudflare MCP `execute`에 넘길 코드를 만든다(`prepare`·`fill`·`deploy`·`status`). 순서는 `docs/AGENT_SETUP.md` 5~7.
+- `scripts/cf_mcp.mjs`: Cloudflare MCP `execute`에 넘길 코드를 만든다(`status`·`prepare` 등). 실제로 Cloudflare에서 도는 코드는 `scripts/cf_mcp/remote.js`(app_starter와 같은 버전). 이 앱은 이미 Git 연결돼 있어 평소에는 `status`(배포·예약 작업 확인)와 스키마를 바꿨을 때의 `prepare`만 쓴다.
 - Supabase 모드: `supabase/schema.sql`(RLS 필수), `scripts/use_supabase.py`가 `examples/supabase/web`의 로그인 예제로 화면을 바꾸고 `wrangler.toml` `[vars]`에 주소·공개 키를 넣는다. 화면에는 publishable 키만 넣는다.
 - `wrangler.toml`: Worker 설정의 기준. 배포 절차와 함정은 `docs/SETUP.md`.
 
@@ -40,4 +40,5 @@ Cloudflare·Supabase 연결은 MCP(브라우저 로그인)로 한다. **API 토�
 - 로컬: `cp .dev.vars.example .dev.vars && npx wrangler@4 d1 execute <이름> --local --file db/schema.sql && npx wrangler@4 dev` (예약 작업 시험: `--test-scheduled` 후 `/__scheduled`)
 - 테스트: `npm test`
 - 배포 확인: `npm run check -- https://<이름>.<계정>.workers.dev`
-- Cloudflare 준비·배포: `node scripts/cf_mcp.mjs prepare --name <이름>` → 생긴 `.wrangler/mcp/prepare.js`를 MCP `execute`로 → `fill` → `deploy`
+- 배포 상태 확인: `node scripts/cf_mcp.mjs status` → 생긴 `.wrangler/mcp/status.js`를 MCP `execute`로. 표를 바꿨으면 `node scripts/cf_mcp.mjs prepare --name rebalance`로 스키마 적용
+- 사이트: https://rebalance.tedcheon.workers.dev
