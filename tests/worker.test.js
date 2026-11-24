@@ -15,7 +15,7 @@ test('정적 파일은 ASSETS로, /api/health는 D1 확인', async () => {
   const e = env();
   assert.equal(await (await worker.fetch(req('/'), e)).text(), 'asset');
   const h = await worker.fetch(req('/api/health'), e);
-  assert.deepEqual(await h.json(), { ok: true, db: true, writeTokenSet: true });
+  assert.deepEqual(await h.json(), { ok: true, db: true, passwordSet: true, passwordSource: 'secret', passwordMinLength: 6, writeTokenSet: true });
 });
 
 test('처음에는 빈 문서(version 0), 편집 암호가 없거나 틀리면 401, 맞으면 저장', async () => {
@@ -44,8 +44,30 @@ test('가격·월말 기록은 누구나 읽는다(빈 상태)', async () => {
   assert.deepEqual(await (await worker.fetch(req('/api/snapshots'), e)).json(), { snapshots: [] });
 });
 
-test('WRITE_TOKEN이 설정되지 않았으면 쓰기를 모두 막는다', () => {
-  assert.equal(canWrite(req('/api/doc', { headers: { Authorization: 'Bearer ' } }), {}), false);
+test('편집 암호가 아무 데도 없으면 쓰기를 모두 막는다', async () => {
+  assert.equal(await canWrite(req('/api/doc', { headers: { Authorization: 'Bearer ' } }), {}), false);
+  assert.equal(await canWrite(req('/api/doc', { headers: { Authorization: 'Bearer x' } }), { DB: fakeD1() }), false);
+});
+
+test('대시보드 비밀값이 없으면 사이트에서 처음 한 번 암호를 정하고, 그 암호로만 저장된다', async () => {
+  const e = env({ token: '' });
+  const h0 = await (await worker.fetch(req('/api/health'), e)).json();
+  assert.deepEqual([h0.passwordSet, h0.passwordSource], [false, null]);
+  assert.equal((await put(e, { doc: { a: 1 }, version: 0 }, 'my-pass-1')).status, 401); // 정하기 전에는 저장 불가
+  const claim = pw => worker.fetch(req('/api/password', { method: 'POST', body: JSON.stringify({ password: pw }) }), e);
+  assert.equal((await claim('short')).status, 422);
+  assert.equal((await claim('my-pass-1')).status, 201);
+  assert.equal((await claim('other-pass')).status, 409);                                // 두 번째는 거절
+  assert.ok(!e.DB.raw.prepare("SELECT value FROM settings WHERE key = 'write_hash'").get().value.includes('my-pass-1')); // 원문 저장 안 함
+  assert.equal((await put(e, { doc: { a: 1 }, version: 0 }, 'other-pass')).status, 401);
+  assert.equal((await put(e, { doc: { a: 1 }, version: 0 }, 'my-pass-1')).status, 200);
+  const h1 = await (await worker.fetch(req('/api/health'), e)).json();
+  assert.deepEqual([h1.passwordSet, h1.passwordSource], [true, 'site']);
+});
+
+test('대시보드 비밀값이 있으면 그것이 우선이고 사이트에서 정하기는 거절', async () => {
+  const e = env();
+  assert.equal((await worker.fetch(req('/api/password', { method: 'POST', body: JSON.stringify({ password: 'my-pass-1' }) }), e)).status, 409);
 });
 
 test('허용하지 않는 요청 방식은 405', async () => {

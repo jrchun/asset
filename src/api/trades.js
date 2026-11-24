@@ -25,7 +25,7 @@ export async function GET({ env }) {
 }
 
 export async function apply({ request, env }) {
-  if (!canWrite(request, env)) return json({ detail: '편집 암호가 필요합니다.' }, 401);
+  if (!(await canWrite(request, env))) return json({ detail: '편집 암호가 필요합니다.' }, 401);
   const body = await readJson(request);
   if (!body || !Number.isInteger(body.version) || !Array.isArray(body.trades)) return json({ detail: '{version, kind, trades} 형식이어야 합니다.' }, 422);
   if (body.trades.length > MAX_TRADES) return json({ detail: `한 번에 ${MAX_TRADES}건까지 반영할 수 있습니다.` }, 422);
@@ -58,7 +58,7 @@ export async function apply({ request, env }) {
 }
 
 export async function undo({ request, env }) {
-  if (!canWrite(request, env)) return json({ detail: '편집 암호가 필요합니다.' }, 401);
+  if (!(await canWrite(request, env))) return json({ detail: '편집 암호가 필요합니다.' }, 401);
   const body = await readJson(request);
   const id = body && Number.isInteger(body.batch) ? body.batch : null;
   if (!id) return json({ detail: '{batch} 형식이어야 합니다.' }, 422);
