@@ -3,6 +3,7 @@
 //   → 편집 암호가 없거나 틀리면(401) needToken({ firstTime, minLength })을 불러 암호를 받은 뒤 그대로 저장
 //     firstTime: 아직 아무도 편집 암호를 정하지 않음 → 입력한 값으로 처음 정한다(대시보드 단계 없음)
 //     minLength: 처음 정할 때의 최소 글자 수(서버가 /api/health로 알려 준다)
+//     hubLogin: 허브 로그인을 쓰면 허브 로그인 주소(암호 칸 대신 "허브에서 로그인" 링크)
 import * as api from './api.js';
 
 export function createDocSync({ render, status, needToken, delay = 700 }) {
@@ -12,6 +13,11 @@ export function createDocSync({ render, status, needToken, delay = 700 }) {
   // 401을 받았을 때: 아직 아무도 암호를 안 정했는지(정하기) 아니면 틀렸는지(입력) 서버에 물어 안내한다.
   async function askForToken() {
     const s = await api.getStatus().catch(() => ({}));
+    if (s.auth === 'hub' && s.hubLogin) {
+      status('저장하려면 허브에서 로그인하세요. 한 번 로그인하면 이 브라우저에서는 내 앱 전부 다시 묻지 않습니다.');
+      needToken({ hubLogin: s.hubLogin });
+      return;
+    }
     firstTime = s.passwordSet === false;
     minLength = s.passwordMinLength || minLength;
     status(firstTime

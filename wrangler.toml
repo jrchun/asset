@@ -28,3 +28,7 @@ crons = ["30 22 * * *"]
 pattern = "rebalance.woongstudio.com"
 custom_domain = true
 # <<< 내 도메인 주소
+
+# 허브 로그인 주소(scripts/cf_mcp.mjs fill이 관리한다). 허브에서 한 번 로그인하면 이 앱에서도 편집된다.
+[vars]
+HUB_URL = "https://hub.woongstudio.com"

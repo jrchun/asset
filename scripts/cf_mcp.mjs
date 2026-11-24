@@ -19,8 +19,8 @@ const USAGE = `사용법: node scripts/cf_mcp.mjs <명령> [옵션]   (순서는
   address [--name <앱이름>]                    (읽기만) 사이트 주소가 어떻게 될지 → 기획 요약에서 확인받는다
   prepare --name <앱이름> [--subdomain <이름>]  D1 만들기·스키마 적용·주소 확인
                                                (계정 이름이 없을 때만, 확인받은 --subdomain으로 만든다)
-  fill --name <앱이름> [--database-id <ID>] [--no-domain]
-                                               wrangler.toml에 이름과 D1 ID, 내 도메인 주소를 채운다(파일만 고침)
+  fill --name <앱이름> [--database-id <ID>] [--no-domain] [--no-hub]
+                                               wrangler.toml에 이름과 D1 ID, 내 도메인 주소, 허브 로그인 주소를 채운다(파일만 고침)
   domain                                       내 도메인 주소(<앱이름>.<내 도메인>)를 지금 Worker에 붙인다
                                                (Worker가 아직 없으면 확인만 하고, 첫 배포 때 붙는다)
   connect --github-account-id <번호> --github-repo-id <번호> [--repo 소유자/이름]
@@ -117,6 +117,36 @@ export function setDomainToml(text, host) {
     t = t.replace(/^(compatibility_date\s*=.*)$/m, '$1\n# 옛 workers.dev 주소도 계속 연다. routes를 넣으면 Cloudflare가 workers.dev를 끄기 때문에 꼭 적어 둔다.\nworkers_dev = true');
   }
   return t.replace(/\n*$/, '\n') + `\n${DOMAIN_BEGIN}\n[[routes]]\npattern = "${host}"\ncustom_domain = true\n${DOMAIN_END}\n`;
+}
+
+// ── 허브 로그인 ───────────────────────────────────────────────
+// 허브에서 한 번 로그인하면 내 도메인 아래 모든 앱에서 편집한다(docs/HUB.md "허브 로그인").
+// 앱의 wrangler.toml [vars]에 HUB_URL을 두면 켜진다. 조건: D1 모드 + 내 도메인 있음 + 허브도 그 도메인 아래(쿠키를 같이 쓰려면).
+
+// CLAUDE.md의 "허브 주소: https://..." 줄. 없거나 "(아직 없음)"이면 null.
+export function parseHubLine(text) {
+  const m = String(text || '').match(/^허브 주소:\s*(\S+)/m);
+  if (!m) return null;
+  try { const u = new URL(m[1]); return u.protocol === 'https:' ? u.origin : null; } catch { return null; }
+}
+export function readHub(root = ROOT) {
+  try { return parseHubLine(fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8')); } catch { return null; }
+}
+
+// 이 앱에 넣을 HUB_URL. 쿠키를 같이 쓸 수 없는 조합이면 null(앱별 암호를 쓴다).
+export function hubUrlFor({ hub, domain, host, d1 }) {
+  if (!hub || !domain || !host || !d1) return null;
+  const h = new URL(hub).hostname;
+  return h.endsWith('.' + domain) && h !== host ? hub : null;
+}
+
+// wrangler.toml의 HUB_URL 한 줄을 넣거나 바꾸거나 지운다. [vars]가 없으면 맨 아래에 만든다.
+export function setHubToml(text, url) {
+  let t = text.replace(/^HUB_URL\s*=.*\n?/m, '').replace(/\n*# 허브 로그인 주소[^\n]*\n\[vars\]\n(?=\n|$)/, '\n');
+  if (!url) return t;
+  const line = `HUB_URL = "${url}"`;
+  if (/^\[vars\]$/m.test(t)) return t.replace(/^\[vars\]$/m, `[vars]\n${line}`);
+  return t.replace(/\n*$/, '\n') + `\n# 허브 로그인 주소(scripts/cf_mcp.mjs fill이 관리한다). 허브에서 한 번 로그인하면 이 앱에서도 편집된다.\n[vars]\n${line}\n`;
 }
 
 function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -256,10 +286,12 @@ const COMMANDS = {
     need(name && NAME_RE.test(name), '--name <앱이름>이 필요합니다.');
     const databaseId = arg(args, '--database-id');
     need(!config.d1 || databaseId || config.d1.id !== PLACEHOLDER_ID, 'D1 모드라 --database-id가 필요합니다(prepare 결과의 database_id).');
-    const host = appHost(name, domainFor(args));
+    const domain = domainFor(args);
+    const host = appHost(name, domain);
+    const hub = args.includes('--no-hub') ? null : hubUrlFor({ hub: readHub(), domain, host, d1: Boolean(config.d1) });
     const file = path.join(ROOT, 'wrangler.toml');
-    fs.writeFileSync(file, setDomainToml(fillToml(fs.readFileSync(file, 'utf8'), { name, databaseId }), host));
-    return { message: `wrangler.toml을 채웠습니다: name=${name}${databaseId ? `, database_id=${databaseId}` : ''}${host ? `, 주소=https://${host}` : ' (내 도메인 없음: workers.dev 주소만)'}. 커밋하세요.` };
+    fs.writeFileSync(file, setHubToml(setDomainToml(fillToml(fs.readFileSync(file, 'utf8'), { name, databaseId }), host), hub));
+    return { message: `wrangler.toml을 채웠습니다: name=${name}${databaseId ? `, database_id=${databaseId}` : ''}${host ? `, 주소=https://${host}` : ' (내 도메인 없음: workers.dev 주소만)'}${hub ? `, 허브 로그인=${hub}` : ' (허브 로그인 없음: 앱별 편집 암호)'}. 커밋하세요.` };
   },
 
   domain(args, config) {

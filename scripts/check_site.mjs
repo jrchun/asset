@@ -21,6 +21,7 @@ await check('Worker·DB 연결 (/api/health)', async () => {
   const r = await fetch(base + '/api/health'); const j = await r.json().catch(() => ({})); health = j;
   if (j.mode === 'supabase') { mode = 'supabase'; expect(r.ok, 'HTTP ' + r.status); return 'Supabase 모드'; }
   expect(r.ok && j.db, 'D1에 연결되지 않음: HTTP ' + r.status + ' ' + JSON.stringify(j));
+  if (j.auth === 'hub') return 'D1 모드, 허브 로그인(' + (j.hubLogin || '').replace(/\/\?login=1$/, '') + ')';
   const set = j.passwordSet ?? j.writeTokenSet;
   return set ? 'D1 모드, 편집 암호 정해짐' : '알림: 편집 암호가 아직 없음 — 사이트에서 처음 저장할 때 정한다(주소를 공유하기 전에 정할 것)';
 });

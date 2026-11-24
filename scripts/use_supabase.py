@@ -4,6 +4,7 @@
 
 하는 일
   - examples/supabase/web의 예제 화면(로그인 + 내 메모)을 web/에 복사하고 연결 정보를 채운다
+  - web/app.json(앱 허브용 자기소개서)의 mode를 supabase로 바꾼다
   - wrangler.toml에서 D1 연결을 빼고 [vars]에 Supabase 주소·공개 키를 넣는다
     (Worker는 정적 화면과 /api/health, 그리고 매일 Supabase 잠들기 방지 예약 작업(src/jobs.js)을 맡는다)
 URL과 키는 공개해도 되는 값이다(publishable). 서비스 키(secret)는 넣지 않는다.
@@ -12,6 +13,7 @@ URL과 키는 공개해도 되는 값이다(publishable). 서비스 키(secret)�
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import shutil
 import sys
@@ -46,15 +48,26 @@ def main(argv=None) -> int:
     if extra not in css:
         (web / "styles.css").write_text(css.rstrip() + "\n\n" + extra, encoding="utf-8")
 
+    app_json = web / "app.json"  # 앱 허브가 읽는 자기소개서(docs/HUB.md). 없으면(예전 앱) 건너뛴다.
+    if app_json.exists():
+        meta = json.loads(app_json.read_text(encoding="utf-8"))
+        meta["mode"] = "supabase"
+        app_json.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
     wr = ROOT / "wrangler.toml"
     t = wr.read_text(encoding="utf-8")
     t = re.sub(r"\n\[\[d1_databases\]\]\n(?:[^\n]+\n)*", "\n", t)
-    t = re.sub(r"\n# Supabase 연결\(공개 값\).*", "", t, flags=re.S).rstrip() + "\n"
+    # 예전 Supabase 칸만 지운다(그 뒤의 내 도메인 주소 칸 등은 남긴다).
+    t = re.sub(r"\n*# Supabase 연결\(공개 값\)[^\n]*\n\[vars\]\nSUPABASE_URL = [^\n]*\nSUPABASE_KEY = [^\n]*\n?", "\n", t)
+    # Supabase 모드는 사람마다 로그인하므로 허브 로그인(HUB_URL, D1 모드 전용)을 뺀다.
+    t = re.sub(r"^HUB_URL\s*=.*\n?", "", t, flags=re.M)
+    t = re.sub(r"\n*# 허브 로그인 주소[^\n]*\n\[vars\]\n(?=\n|$)", "\n", t).rstrip() + "\n"
     t += f'\n# Supabase 연결(공개 값). 매일 잠들기 방지 예약 작업(src/jobs.js)이 쓴다.\n[vars]\nSUPABASE_URL = "{url}"\nSUPABASE_KEY = "{key}"\n'
     wr.write_text(t, encoding="utf-8")
 
     print("Supabase 모드로 바꿨습니다.")
     print(" - web/: 로그인 + 내 메모 예제, web/js/config.js에 연결 정보")
+    print(" - web/app.json: mode = supabase")
     print(" - wrangler.toml: D1 연결 제거, [vars]에 Supabase 주소·공개 키(매일 잠들기 방지 예약 작업용)")
     print("남은 일: supabase/schema.sql 적용, Supabase에서 이메일 확인(Confirm email) 끄기 — docs/AGENT_SETUP.md")
     return 0
