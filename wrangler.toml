@@ -4,8 +4,9 @@
 name = "rebalance"
 main = "./src/worker.js"
 compatibility_date = "2026-11-01"
-# 옛 workers.dev 주소도 계속 연다. routes를 넣으면 Cloudflare가 workers.dev를 끄기 때문에 꼭 적어 둔다.
-workers_dev = true
+# 옛 workers.dev 주소(rebalance.tedcheon.workers.dev)는 닫았다(사용자 결정 2026-11-25). 새 주소만 쓴다.
+# 다시 열려면 true로 바꾼다(routes가 있으면 이 줄이 없을 때 Cloudflare가 workers.dev를 끈다).
+workers_dev = false
 send_metrics = false
 
 # 정적 파일. 요청과 맞는 파일이 있으면 Worker를 거치지 않고 바로 보낸다. 없을 때만 src/worker.js가 실행된다.

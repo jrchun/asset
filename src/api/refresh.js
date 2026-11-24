@@ -3,7 +3,7 @@ import { json, canWrite } from '../lib/http.js';
 import { collectPrices, priceDoc } from '../prices/collect.js';
 
 export async function POST({ request, env }) {
-  if (!canWrite(request, env)) return json({ detail: '편집 암호가 필요합니다.' }, 401);
+  if (!(await canWrite(request, env))) return json({ detail: '편집 암호가 필요합니다.' }, 401);
   const result = await collectPrices(env);
   return json({ result, prices: await priceDoc(env) });
 }

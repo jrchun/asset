@@ -60,7 +60,12 @@ function kstTime(iso) {
 const sync = createDocSync({
   render(doc, opts) { applyPortfolio(doc, opts && opts.force); },
   status(text) { $('saveState').textContent = text; },
-  needToken() { $('tokenForm').hidden = false; $('tokenIn').focus(); },
+  needToken({ firstTime, minLength } = {}) {
+    $('tokenLabel').textContent = firstTime ? '편집 암호 정하기' : '편집 암호';
+    $('tokenIn').autocomplete = firstTime ? 'new-password' : 'current-password';
+    $('tokenIn').minLength = firstTime ? minLength : 0;
+    $('tokenForm').hidden = false; $('tokenIn').focus();
+  },
 });
 function edited() { state.example = false; sync.edit(() => {}); }
 
@@ -403,7 +408,7 @@ async function refreshPrices() {
   const btn = $('refreshBtn'); if (btn) { btn.disabled = true; btn.textContent = '받는 중…'; }
   await sync.settle();
   const r = await api.refreshPrices().catch(() => ({ ok: false, error: '서버에 연결하지 못했습니다.' }));
-  if (r.unauthorized) { $('saveState').textContent = '가격을 새로 받으려면 편집 암호를 입력하세요.'; $('tokenForm').hidden = false; $('tokenIn').focus(); }
+  if (r.unauthorized) { sync.askForToken(); }
   else if (!r.ok) $('saveState').textContent = '가격을 받지 못했습니다: ' + r.error;
   else {
     realPrices = r.prices;
@@ -510,7 +515,7 @@ async function submitTrades() {
   const kind = tradeKind;
   const r = await api.applyTrades({ version: sync.version, kind, fx: fxOf(prices()), trades: rows }).catch(() => ({ ok: false, error: '서버에 연결하지 못했습니다.' }));
   btn.disabled = false;
-  if (r.unauthorized) { err.hidden = false; err.textContent = '반영하려면 아래에 편집 암호를 입력한 뒤 다시 반영을 누르세요.'; $('tokenForm').hidden = false; $('tokenIn').focus(); return; }
+  if (r.unauthorized) { err.hidden = false; err.textContent = '반영하려면 아래에 편집 암호를 입력한 뒤 다시 반영을 누르세요.'; sync.askForToken(); return; }
   if (r.conflict) { sync.replace(r.doc, r.version); $('saveState').textContent = '다른 기기에서 수정돼 새로 불러왔습니다. 매매안을 확인하고 다시 체결 반영을 눌러 주세요.'; return; }
   if (!r.ok) { err.hidden = false; err.textContent = r.error; return; }
   closeTrade();

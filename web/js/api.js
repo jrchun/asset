@@ -25,6 +25,25 @@ export async function putDoc(doc, version) {
   return { ok: true, ...(await res.json()) };
 }
 
+// 서버 상태(편집 암호가 정해졌는지 등). /api/health
+export async function getStatus() {
+  const res = await fetch('/api/health', { cache: 'no-store' });
+  return res.json();
+}
+
+// 편집 암호 처음 정하기. 성공 { ok: true } / 이미 정해짐 { ok: false, taken: true } / 너무 짧음 { ok: false, detail }
+export async function claimPassword(password) {
+  const res = await fetch('/api/password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  if (res.status === 201) return { ok: true };
+  if (res.status === 409) return { ok: false, taken: true };
+  const j = await res.json().catch(() => ({}));
+  return { ok: false, detail: j.detail || 'HTTP ' + res.status };
+}
+
 export async function getPrices() {
   const res = await fetch('/api/prices', { cache: 'no-store' });
   if (!res.ok) throw new Error('HTTP ' + res.status);

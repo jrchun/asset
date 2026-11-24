@@ -5,6 +5,7 @@
 // 예약 작업(매일 등)은 src/jobs.js. 시각은 wrangler.toml의 [triggers] crons.
 import * as doc from './api/doc.js';
 import * as health from './api/health.js';
+import * as password from './api/password.js';
 import * as prices from './api/prices.js';
 import * as refresh from './api/refresh.js';
 import * as trades from './api/trades.js';
@@ -16,6 +17,7 @@ import { runScheduled } from './jobs.js';
 const ROUTES = {
   '/api/doc': doc,
   '/api/health': health,
+  '/api/password': password,
   '/api/prices': prices,
   '/api/prices/refresh': refresh,
   '/api/trades': { GET: trades.GET },
