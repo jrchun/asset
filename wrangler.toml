@@ -4,6 +4,8 @@
 name = "rebalance"
 main = "./src/worker.js"
 compatibility_date = "2026-11-01"
+# 옛 workers.dev 주소도 계속 연다. routes를 넣으면 Cloudflare가 workers.dev를 끄기 때문에 꼭 적어 둔다.
+workers_dev = true
 send_metrics = false
 
 # 정적 파일. 요청과 맞는 파일이 있으면 Worker를 거치지 않고 바로 보낸다. 없을 때만 src/worker.js가 실행된다.
@@ -19,3 +21,9 @@ database_id = "c8d41855-6216-4b9b-8e02-98e703c69d85"
 # 예약 작업(src/jobs.js). UTC 기준: 매일 07:30 KST. 무료 플랜은 계정 전체에서 Cron Trigger 5개까지다.
 [triggers]
 crons = ["30 22 * * *"]
+
+# >>> 내 도메인 주소 (scripts/cf_mcp.mjs fill이 관리한다. 손으로 고치지 않는다)
+[[routes]]
+pattern = "rebalance.woongstudio.com"
+custom_domain = true
+# <<< 내 도메인 주소
