@@ -19,13 +19,17 @@ const USAGE = `사용법: node scripts/cf_mcp.mjs <명령> [옵션]   (순서는
   address [--name <앱이름>]                    (읽기만) 사이트 주소가 어떻게 될지 → 기획 요약에서 확인받는다
   prepare --name <앱이름> [--subdomain <이름>]  D1 만들기·스키마 적용·주소 확인
                                                (계정 이름이 없을 때만, 확인받은 --subdomain으로 만든다)
-  fill --name <앱이름> [--database-id <ID>]     wrangler.toml에 이름과 D1 ID를 채운다(파일만 고침)
+  fill --name <앱이름> [--database-id <ID>] [--no-domain]
+                                               wrangler.toml에 이름과 D1 ID, 내 도메인 주소를 채운다(파일만 고침)
+  domain                                       내 도메인 주소(<앱이름>.<내 도메인>)를 지금 Worker에 붙인다
+                                               (Worker가 아직 없으면 확인만 하고, 첫 배포 때 붙는다)
   connect --github-account-id <번호> --github-repo-id <번호> [--repo 소유자/이름]
                                                Cloudflare에 저장소를 연결하고 첫 빌드 시작
                                                번호: gh api -X GET search/repositories -f q='repo:소유자/이름' --jq '.items[0] | {repo_id: .id, owner_id: .owner.id}'
   status                                       배포 시각·예약 작업·Git 자동 배포 최근 결과
   deploy                                       (예비) web/을 묶어 Worker를 직접 올린다(작은 앱만)
 
+내 도메인은 CLAUDE.md의 "내 도메인:" 줄 한 곳에서 읽는다(--domain으로 바꿀 수 있음). 비어 있으면 workers.dev 주소만 쓴다.
 코드 파일은 .wrangler/mcp/<명령>.js에 생긴다(--out으로 바꿀 수 있음). 계정이 여러 개면 execute에 account_id도 넘긴다.`;
 
 // ── wrangler.toml ─────────────────────────────────────────────
@@ -64,6 +68,9 @@ export function readConfig(root = ROOT) {
     d1: d1 && { binding: d1.binding, name: d1.database_name, id: d1.database_id },
     crons: cfg.tables.triggers ? cfg.tables.triggers.crons || [] : null, // null = [triggers] 없음(건드리지 않음)
     vars: cfg.tables.vars || {},
+    // 내 도메인 주소(직접 연결 도메인). [[routes]]에서 custom_domain = true인 것만.
+    hosts: (cfg.arrays.routes || []).filter(r => r.custom_domain === true && typeof r.pattern === 'string').map(r => r.pattern),
+    workersDev: cfg.top.workers_dev,
   };
 }
 
@@ -77,6 +84,42 @@ export function fillToml(text, { name, databaseId }) {
   }
   return t;
 }
+
+// ── 내 도메인 ─────────────────────────────────────────────────
+// 앱 주소를 https://<앱이름>.<내 도메인>으로 쓴다(예: gym-log.woongstudio.com). 도메인은 같은 Cloudflare 계정에 있어야 한다.
+// wrangler.toml에는 표시 줄 사이에 [[routes]]를 넣는다. 표시 줄 안은 fill이 다시 쓰므로 손으로 고치지 않는다.
+
+export const DOMAIN_RE = /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+const DOMAIN_BEGIN = '# >>> 내 도메인 주소 (scripts/cf_mcp.mjs fill이 관리한다. 손으로 고치지 않는다)';
+const DOMAIN_END = '# <<< 내 도메인 주소';
+
+// CLAUDE.md의 "내 도메인: woongstudio.com" 줄을 읽는다. 없거나 "(아직 없음)"이면 null.
+export function parseDomainLine(text) {
+  const m = String(text || '').match(/^내 도메인:\s*(\S+)/m);
+  if (!m) return null;
+  const d = m[1].toLowerCase().replace(/^https?:\/\//, '').replace(/[/.]+$/, '');
+  return DOMAIN_RE.test(d) ? d : null;
+}
+
+export function readDomain(root = ROOT) {
+  try { return parseDomainLine(fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8')); } catch { return null; }
+}
+
+export const appHost = (name, domain) => (name && domain ? `${name}.${domain}` : null);
+
+// wrangler.toml의 내 도메인 주소 칸을 host로 바꾼다. host가 없으면 칸을 지운다(workers.dev만 쓴다).
+// routes가 있으면 Cloudflare가 workers.dev 주소를 끄므로, workers_dev = true가 없으면 함께 넣는다(옛 주소 유지).
+export function setDomainToml(text, host) {
+  const block = new RegExp(`\\n*${escapeRe(DOMAIN_BEGIN)}[\\s\\S]*?${escapeRe(DOMAIN_END)}\\n?`);
+  let t = text.replace(block, '\n');
+  if (!host) return t;
+  if (!/^workers_dev\s*=/m.test(t)) {
+    t = t.replace(/^(compatibility_date\s*=.*)$/m, '$1\n# 옛 workers.dev 주소도 계속 연다. routes를 넣으면 Cloudflare가 workers.dev를 끄기 때문에 꼭 적어 둔다.\nworkers_dev = true');
+  }
+  return t.replace(/\n*$/, '\n') + `\n${DOMAIN_BEGIN}\n[[routes]]\npattern = "${host}"\ncustom_domain = true\n${DOMAIN_END}\n`;
+}
+
+function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 // ── 이름·저장소 ───────────────────────────────────────────────
 
@@ -182,13 +225,21 @@ function need(cond, message) { if (!cond) throw new Error(message); }
 
 const appNameIsSet = config => config.name && config.name !== PLACEHOLDER_NAME;
 
+// 이번 명령에서 쓸 내 도메인. --no-domain이면 없음, --domain이 있으면 그것, 아니면 CLAUDE.md.
+function domainFor(args) {
+  if (args.includes('--no-domain')) return null;
+  const d = arg(args, '--domain');
+  if (d !== undefined) { need(DOMAIN_RE.test(String(d).toLowerCase()), '--domain은 woongstudio.com 같은 도메인이어야 합니다.'); return d.toLowerCase(); }
+  return readDomain();
+}
+
 // 각 명령은 { file?, params? } 또는 { message }를 돌려준다. params가 있으면 remote.js의 같은 이름 함수로 코드를 만든다.
 const COMMANDS = {
   address(args, config) {
     const repo = repoFromGit();
     const name = arg(args, '--name') || (appNameIsSet(config) ? config.name : toAppName(repo?.repo));
     need(name && NAME_RE.test(name), '--name <앱이름>을 정해 주세요(영문 소문자·숫자·하이픈).');
-    return { params: { name, proposals: subdomainCandidates(repo?.owner) } };
+    return { params: { name, proposals: subdomainCandidates(repo?.owner), host: appHost(name, domainFor(args)) } };
   },
 
   prepare(args, config) {
@@ -197,7 +248,7 @@ const COMMANDS = {
     const confirmedSubdomain = arg(args, '--subdomain') || null;
     need(!confirmedSubdomain || NAME_RE.test(confirmedSubdomain), '--subdomain은 영문 소문자·숫자·하이픈만 쓸 수 있습니다.');
     const schema = fs.readFileSync(path.join(ROOT, 'db/schema.sql'), 'utf8');
-    return { params: { name, schema, wantD1: Boolean(config.d1), confirmedSubdomain } };
+    return { params: { name, schema, wantD1: Boolean(config.d1), confirmedSubdomain, host: appHost(name, domainFor(args)) } };
   },
 
   fill(args, config) {
@@ -205,9 +256,19 @@ const COMMANDS = {
     need(name && NAME_RE.test(name), '--name <앱이름>이 필요합니다.');
     const databaseId = arg(args, '--database-id');
     need(!config.d1 || databaseId || config.d1.id !== PLACEHOLDER_ID, 'D1 모드라 --database-id가 필요합니다(prepare 결과의 database_id).');
+    const host = appHost(name, domainFor(args));
     const file = path.join(ROOT, 'wrangler.toml');
-    fs.writeFileSync(file, fillToml(fs.readFileSync(file, 'utf8'), { name, databaseId }));
-    return { message: `wrangler.toml을 채웠습니다: name=${name}${databaseId ? `, database_id=${databaseId}` : ''}. 커밋하세요.` };
+    fs.writeFileSync(file, setDomainToml(fillToml(fs.readFileSync(file, 'utf8'), { name, databaseId }), host));
+    return { message: `wrangler.toml을 채웠습니다: name=${name}${databaseId ? `, database_id=${databaseId}` : ''}${host ? `, 주소=https://${host}` : ' (내 도메인 없음: workers.dev 주소만)'}. 커밋하세요.` };
+  },
+
+  domain(args, config) {
+    need(appNameIsSet(config), '먼저 fill로 wrangler.toml의 name을 정하세요.');
+    const domain = domainFor(args);
+    const host = config.hosts[0] || appHost(config.name, domain);
+    need(host, 'CLAUDE.md에 "내 도메인:" 줄이 없거나 비어 있습니다(또는 --domain을 넘기세요).');
+    if (!config.hosts.includes(host)) console.log(`주의: wrangler.toml에 ${host}가 없습니다. fill을 다시 실행해 넣고 커밋하세요(안 넣으면 다음 배포 때 workers.dev 설정과 어긋날 수 있다).`);
+    return { params: { name: config.name, host } };
   },
 
   connect(args, config) {
@@ -218,7 +279,7 @@ const COMMANDS = {
     const fromGit = repoFromGit();
     const [owner, repo] = (arg(args, '--repo') || (fromGit ? `${fromGit.owner}/${fromGit.repo}` : '')).split('/');
     need(owner && repo, '--repo 소유자/이름을 정해 주세요.');
-    return { params: { name: config.name, owner, repo, ownerId, repoId, compatibilityDate: config.compatibilityDate } };
+    return { params: { name: config.name, owner, repo, ownerId, repoId, compatibilityDate: config.compatibilityDate, host: config.hosts[0] || null } };
   },
 
   status(args, config) {
@@ -240,7 +301,7 @@ const COMMANDS = {
       bindings,
       keep_bindings: ['secret_text', 'secret_key'], // 대시보드에서 넣은 비밀(WRITE_TOKEN 등)은 유지
     };
-    return { params: { name: config.name, metadata, crons: config.crons, modules: bundle.modules, texts: bundle.texts, binaries: bundle.binaries } };
+    return { params: { name: config.name, metadata, crons: config.crons, modules: bundle.modules, texts: bundle.texts, binaries: bundle.binaries, hosts: config.hosts } };
   },
 };
 

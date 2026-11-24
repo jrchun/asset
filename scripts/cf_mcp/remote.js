@@ -12,14 +12,17 @@ export async function address(P, cloudflare, accountId) {
   try { sub = (await cloudflare.request({ method: 'GET', path: `/accounts/${accountId}/workers/subdomain` })).result?.subdomain || null; } catch { sub = null; }
   const workers = (await cloudflare.request({ method: 'GET', path: `/accounts/${accountId}/workers/scripts` })).result.map(w => w.id);
   if (sub) {
+    const wd = `https://${P.name}.${sub}.workers.dev`;
     return {
-      name: P.name, account_subdomain: sub, url: `https://${P.name}.${sub}.workers.dev`,
+      name: P.name, account_subdomain: sub, url: P.host ? `https://${P.host}` : wd, workers_dev_url: wd,
       name_taken_in_account: workers.includes(P.name),
-      note: '계정 이름은 이미 정해져 있어 AI가 바꾸지 않는다. 앱 이름만 고를 수 있다.',
+      note: P.host
+        ? '내 도메인 주소가 대표 주소다(workers.dev 주소는 예비로 같이 열린다). 앱 이름만 고를 수 있다.'
+        : '계정 이름은 이미 정해져 있어 AI가 바꾸지 않는다. 앱 이름만 고를 수 있다.',
     };
   }
   return {
-    name: P.name, account_subdomain: null,
+    name: P.name, account_subdomain: null, url: P.host ? `https://${P.host}` : undefined,
     proposals: P.proposals.map(p => ({ subdomain: p, url: `https://${P.name}.${p}.workers.dev` })),
     note: '처음 쓰는 계정이다. 계정 이름은 한 번 정하면 바꿀 수 없고 모든 앱 주소에 들어간다. 기획자에게 골라 받은 뒤 prepare --subdomain으로 만든다.',
   };
@@ -53,6 +56,7 @@ export async function prepare(P, cloudflare, accountId) {
   out.subdomain = sub;
   if (sub) {
     out.url = `https://${P.name}.${sub}.workers.dev`;
+    if (P.host) { out.workers_dev_url = out.url; out.url = `https://${P.host}`; }
     if (P.confirmedSubdomain && sub !== P.confirmedSubdomain) out.subdomain_note = `계정 이름이 이미 ${sub}(으)로 정해져 있어 그대로 쓴다.`;
   } else {
     out.subdomain_note = P.confirmedSubdomain
@@ -103,6 +107,8 @@ export async function connect(P, cloudflare, accountId) {
           git_repository: { provider_type: 'github', provider_account_id: P.ownerId, provider_account_name: P.owner, repo_id: P.repoId, repo_name: P.repo, branch: 'main' },
           production_settings: { build_command: '', deploy_command: 'npx wrangler deploy', build_token_uuid: tokens[0].build_token_uuid, root_directory: '/', path_includes: ['*'], path_excludes: [], build_caching_enabled: true },
           previews_enabled: false,
+          // 미리보기를 끄더라도 이 설정은 API 필수 항목이다(없으면 400 "Invalid request body", 2026-11-15 확인).
+          previews_base_config: { build_command: '', deploy_command: 'npx wrangler preview', build_token_uuid: tokens[0].build_token_uuid, root_directory: '/', path_includes: ['*'], path_excludes: [], build_caching_enabled: true },
         },
       });
     } catch (e) {
@@ -115,7 +121,8 @@ export async function connect(P, cloudflare, accountId) {
   if (!prod) return fail('빌드', '연결은 됐지만 빌드 설정을 찾지 못했다. main에 아무 커밋이나 올리면 빌드가 시작된다.');
   const build = (await cloudflare.request({ method: 'POST', path: `${base}/builds/triggers/${prod.trigger_uuid}/builds`, body: { branch: 'main' } })).result;
   const sub = (await cloudflare.request({ method: 'GET', path: `${base}/workers/subdomain` })).result.subdomain;
-  return { ...out, ok: true, build_uuid: build?.build_uuid, url: `https://${P.name}.${sub}.workers.dev`, next: '1~2분 뒤 status로 git_build가 success인지 보고 check_site로 검사한다.' };
+  const wd = `https://${P.name}.${sub}.workers.dev`;
+  return { ...out, ok: true, build_uuid: build?.build_uuid, url: P.host ? `https://${P.host}` : wd, workers_dev_url: wd, next: '1~2분 뒤 status로 git_build가 success인지 보고 check_site로 검사한다.' };
 }
 
 // status: 배포 시각, 예약 작업, 대시보드 편집 암호 유무, Git 자동 배포 최근 결과.
@@ -156,5 +163,47 @@ export async function deploy(P, cloudflare, accountId) {
   await cloudflare.request({ method: 'POST', path: `${script}/subdomain`, body: { enabled: true, previews_enabled: false } });
   const sub = (await cloudflare.request({ method: 'GET', path: `/accounts/${accountId}/workers/subdomain` })).result.subdomain;
   out.url = `https://${P.name}.${sub}.workers.dev`;
+  // 내 도메인 주소(wrangler.toml [[routes]] custom_domain). 붙이지 못해도 workers.dev로는 열리니 오류만 적는다.
+  for (const hostname of P.hosts || []) {
+    try {
+      await cloudflare.request({ method: 'PUT', path: `/accounts/${accountId}/workers/domains`, body: { hostname, service: P.name, enabled: true } });
+      out.workers_dev_url = out.url; out.url = `https://${hostname}`;
+    } catch (e) { out.domain_error = String(e.message || e).slice(0, 200); }
+  }
   return out;
+}
+
+// domain: 내 도메인 주소(P.host, 예: gym-log.woongstudio.com)를 Worker에 붙인다. 여러 번 실행해도 안전하다.
+// DNS 기록과 인증서는 Cloudflare가 자동으로 만든다. 같은 이름의 CNAME 기록이 이미 있으면 붙일 수 없다.
+// Worker가 아직 없으면 확인만 한다(첫 배포 때 wrangler.toml의 [[routes]]로 붙는다).
+export async function domain(P, cloudflare, accountId) {
+  const base = `/accounts/${accountId}`;
+  const out = { name: P.name, host: P.host, url: `https://${P.host}` };
+  const fail = (step, note, e) => ({ ...out, ok: false, step, note, error: e ? String(e.message || e).slice(0, 300) : undefined });
+
+  // 도메인(zone) 찾기: 주소 뒤쪽부터 맞춰 본다(gym-log.woongstudio.com → woongstudio.com).
+  const labels = P.host.split('.');
+  let zone = null;
+  for (let i = 1; i < labels.length - 1 && !zone; i++) {
+    const name = labels.slice(i).join('.');
+    const found = (await cloudflare.request({ method: 'GET', path: '/zones', query: { name } })).result || [];
+    zone = found.find(z => z.name === name && (!z.account || z.account.id === accountId)) || null;
+  }
+  if (!zone) return fail('도메인', '이 Cloudflare 계정에 그 도메인이 없다. 같은 계정에서 샀는지(다른 곳에서 샀다면 네임서버를 Cloudflare로 바꿨는지) 확인한다.');
+  out.zone = zone.name;
+  if (zone.status !== 'active') return fail('도메인', `도메인 상태가 ${zone.status}다. 산 직후나 네임서버를 바꾼 직후면 active가 될 때까지 기다린다.`);
+
+  const attached = ((await cloudflare.request({ method: 'GET', path: `${base}/workers/domains`, query: { hostname: P.host } })).result || [])
+    .find(d => d.hostname === P.host);
+  if (attached && attached.service !== P.name) return fail('겹침', `${P.host}는 이미 다른 Worker(${attached.service})에 붙어 있다. 다른 앱 이름을 쓰거나 그쪽 연결을 먼저 뗀다.`);
+  if (attached) return { ...out, ok: true, already: true };
+
+  const exists = (await cloudflare.request({ method: 'GET', path: `${base}/workers/scripts` })).result.some(w => w.id === P.name);
+  if (!exists) return { ...out, ok: true, attached: false, note: 'Worker가 아직 없다. 첫 배포 때 wrangler.toml의 [[routes]]로 붙는다.' };
+  try {
+    await cloudflare.request({ method: 'PUT', path: `${base}/workers/domains`, body: { hostname: P.host, service: P.name, zone_id: zone.id, enabled: true } });
+  } catch (e) {
+    return fail('붙이기', '붙이지 못했다. 그 이름의 DNS 기록(특히 CNAME)이 이미 있으면 Cloudflare가 거절한다: 대시보드 › 도메인 › DNS에서 확인한다.', e);
+  }
+  return { ...out, ok: true, attached: true, note: 'DNS·인증서는 Cloudflare가 자동으로 만든다. 1~2분 뒤 열린다.' };
 }

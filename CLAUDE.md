@@ -15,12 +15,15 @@
 **새 앱을 만들거나 배포하라는 요청이면 먼저 `docs/AGENT_SETUP.md`를 읽고 그 순서를 따른다.** (Codex 등은 `AGENTS.md`)
 Cloudflare·Supabase 연결은 MCP(브라우저 로그인)로 한다. **API 토큰을 만들게 하지 않는다.** 앱마다 사용자 계정의 GitHub 저장소가 있고, `main`에 올리면 Cloudflare가 자동 배포한다.
 
+내 도메인: woongstudio.com
+- 앱 주소는 `https://<앱이름>.<내 도메인>`(이 앱: `https://rebalance.woongstudio.com`). 이 줄 한 곳에만 둔다. `cf_mcp.mjs fill`이 읽어 `wrangler.toml`에 넣는다(Cloudflare가 DNS·인증서 자동). 옛 `workers.dev` 주소도 예비로 계속 열린다(`workers_dev = true`). 자세한 것은 app_starter `docs/DOMAIN.md`.
+
 ## 구성
 - `web/`: 정적 화면(빌드 없음). Worker 정적 자산으로 그대로 배포된다. `web/js/docsync.js`가 불러오기·자동 저장·충돌(409)·편집 암호(401)를 맡는다. 앱 화면은 `web/js/app.js`.
 - `src/worker.js`: `/api/*`만 처리. 새 API는 `src/api/<이름>.js`에 `GET/PUT/POST/DELETE`를 만들고 `ROUTES`에 추가.
 - `src/jobs.js`: 예약 작업(매일 등). `wrangler.toml`의 `[triggers] crons`(UTC) 시각에 Worker 안에서 돈다. 토큰·GitHub Actions 없음. 무료 플랜은 계정 전체 Cron 5개.
 - `db/schema.sql`: D1 스키마(`CREATE TABLE IF NOT EXISTS`만). 바꾸면 `node scripts/cf_mcp.mjs prepare`로 만든 코드를 Cloudflare MCP `execute`로 실행해 적용.
-- `scripts/cf_mcp.mjs`: Cloudflare MCP `execute`에 넘길 코드를 만든다(`status`·`prepare` 등). 실제로 Cloudflare에서 도는 코드는 `scripts/cf_mcp/remote.js`(app_starter와 같은 버전). 이 앱은 이미 Git 연결돼 있어 평소에는 `status`(배포·예약 작업 확인)와 스키마를 바꿨을 때의 `prepare`만 쓴다.
+- `scripts/cf_mcp.mjs`: Cloudflare MCP `execute`에 넘길 코드를 만든다(`status`·`prepare`·`domain` 등). 실제로 Cloudflare에서 도는 코드는 `scripts/cf_mcp/remote.js`(app_starter와 같은 버전). 이 앱은 이미 Git 연결돼 있어 평소에는 `status`(배포·예약 작업 확인)와 스키마를 바꿨을 때의 `prepare`만 쓴다.
 - Supabase 모드: `supabase/schema.sql`(RLS 필수), `scripts/use_supabase.py`가 `examples/supabase/web`의 로그인 예제로 화면을 바꾸고 `wrangler.toml` `[vars]`에 주소·공개 키를 넣는다. 화면에는 publishable 키만 넣는다.
 - `wrangler.toml`: Worker 설정의 기준. 배포 절차와 함정은 `docs/SETUP.md`.
 
@@ -39,6 +42,6 @@ Cloudflare·Supabase 연결은 MCP(브라우저 로그인)로 한다. **API 토�
 ## 실행
 - 로컬: `cp .dev.vars.example .dev.vars && npx wrangler@4 d1 execute <이름> --local --file db/schema.sql && npx wrangler@4 dev` (예약 작업 시험: `--test-scheduled` 후 `/__scheduled`)
 - 테스트: `npm test`
-- 배포 확인: `npm run check -- https://<이름>.<계정>.workers.dev`
+- 배포 확인: `npm run check -- https://rebalance.woongstudio.com`
 - 배포 상태 확인: `node scripts/cf_mcp.mjs status` → 생긴 `.wrangler/mcp/status.js`를 MCP `execute`로. 표를 바꿨으면 `node scripts/cf_mcp.mjs prepare --name rebalance`로 스키마 적용
-- 사이트: https://rebalance.tedcheon.workers.dev
+- 사이트: https://rebalance.woongstudio.com (예비: https://rebalance.tedcheon.workers.dev)
