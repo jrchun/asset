@@ -1,5 +1,5 @@
 // GET /api/health → {ok, db, passwordSet, ...} : 배포 확인용(scripts/check_site.mjs)과 화면(편집 암호를 "정하기"로 보여 줄지)이 쓴다.
-import { json, passwordState, MIN_PASSWORD } from '../lib/http.js';
+import { json, passwordState, hubUrl, MIN_PASSWORD } from '../lib/http.js';
 
 export async function GET({ env }) {
   // Supabase 모드: D1이 없다. DB는 Supabase가 맡고, 여기서는 Worker가 살아 있는지만 알린다.
@@ -11,5 +11,7 @@ export async function GET({ env }) {
     ok: true, db,
     passwordSet: pw.set, passwordSource: pw.source, passwordMinLength: MIN_PASSWORD,
     writeTokenSet: Boolean(env.WRITE_TOKEN), // 예전 check_site·허브가 읽는다(지우지 않는다)
+    // 허브 로그인을 쓰면 화면이 "허브에서 로그인 →" 링크를 보여 준다(app_starter docs/HUB.md "허브 로그인").
+    ...(hubUrl(env) ? { auth: 'hub', hubLogin: hubUrl(env) + '/?login=1' } : { auth: 'password' }),
   }, db ? 200 : 503);
 }

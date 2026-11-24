@@ -118,6 +118,8 @@ tfoot td{border-top:1px solid var(--line);font-weight:600}
 button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:8px 12px;font-size:.88rem;font-weight:500}
 button:hover{border-color:var(--accent)}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+a.primary{display:inline-flex;align-items:center;min-height:38px;padding:8px 12px;border-radius:6px;background:var(--accent);color:var(--surface);font-size:.88rem;font-weight:500;text-decoration:none}
+a.primary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .warnline{color:var(--bad);font-size:.84rem;font-weight:500}
 .example{font-size:.72rem;font-weight:600;color:var(--warn);background:var(--warn-soft);padding:2px 8px;border-radius:4px}

@@ -15,7 +15,7 @@ test('정적 파일은 ASSETS로, /api/health는 D1 확인', async () => {
   const e = env();
   assert.equal(await (await worker.fetch(req('/'), e)).text(), 'asset');
   const h = await worker.fetch(req('/api/health'), e);
-  assert.deepEqual(await h.json(), { ok: true, db: true, passwordSet: true, passwordSource: 'secret', passwordMinLength: 6, writeTokenSet: true });
+  assert.deepEqual(await h.json(), { ok: true, db: true, passwordSet: true, passwordSource: 'secret', passwordMinLength: 6, writeTokenSet: true, auth: 'password' });
 });
 
 test('처음에는 빈 문서(version 0), 편집 암호가 없거나 틀리면 401, 맞으면 저장', async () => {
@@ -100,4 +100,22 @@ test('체결은 한 번에 100건까지만 반영한다', async () => {
   const r = await worker.fetch(req('/api/trades/apply', { method: 'POST', headers: { Authorization: 'Bearer secret', 'Content-Type': 'application/json' }, body: JSON.stringify({ version: 1, kind: 'manual', trades }) }), e);
   assert.equal(r.status, 422);
   assert.match((await r.json()).detail, /100건/);
+});
+
+test('허브 로그인(HUB_URL): 허브가 진짜라고 한 쿠키로만 저장, health가 로그인 주소를 알려 준다', async () => {
+  const e = { ...env({ token: '' }), HUB_URL: 'https://hub.woongstudio.com' };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (String(url) !== 'https://hub.woongstudio.com/api/session') return realFetch(url, init);
+    const ok = JSON.parse(init.body).token === 'v1.9999999999.goodgoodgoodgoodgood';
+    return new Response(JSON.stringify(ok ? { ok: true, exp: 9999999999 } : { ok: false }), { status: ok ? 200 : 401 });
+  };
+  try {
+    const h = await (await worker.fetch(req('/api/health'), e)).json();
+    assert.deepEqual([h.auth, h.hubLogin], ['hub', 'https://hub.woongstudio.com/?login=1']);
+    const putWith = c => worker.fetch(req('/api/doc', { method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: `hub_session=${c}` }, body: JSON.stringify({ doc: { a: 1 }, version: 0 }) }), e);
+    assert.equal((await putWith('v1.9999999999.badbadbadbadbadbadbad')).status, 401);
+    assert.equal((await putWith('v1.9999999999.goodgoodgoodgoodgood')).status, 200);
+    assert.equal((await worker.fetch(req('/api/password', { method: 'POST', body: JSON.stringify({ password: 'my-pass-1' }) }), e)).status, 409); // 앱별 암호는 안 씀
+  } finally { globalThis.fetch = realFetch; }
 });
