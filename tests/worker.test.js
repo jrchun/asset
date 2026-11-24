@@ -15,7 +15,7 @@ test('정적 파일은 ASSETS로, /api/health는 D1 확인', async () => {
   const e = env();
   assert.equal(await (await worker.fetch(req('/'), e)).text(), 'asset');
   const h = await worker.fetch(req('/api/health'), e);
-  assert.deepEqual(await h.json(), { ok: true, db: true, passwordSet: true, passwordSource: 'secret', passwordMinLength: 6, writeTokenSet: true, auth: 'password' });
+  assert.deepEqual(await h.json(), { ok: true, db: true, passwordSet: true, passwordSource: 'secret', passwordMinLength: 6, writeTokenSet: true, starter: 1, usage: { last30d: 0, lastUsedAt: null }, auth: 'password' });
 });
 
 test('처음에는 빈 문서(version 0), 편집 암호가 없거나 틀리면 401, 맞으면 저장', async () => {
