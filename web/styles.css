@@ -232,3 +232,80 @@ button{min-height:38px}
 .token input{flex:1 1 160px;width:auto}
 .f-cur{grid-column:span 2}
 @media (max-width:640px){.f-cur{grid-column:span 4}}
+/* 그룹 비중 도넛 */
+.mix{display:grid;grid-template-columns:150px minmax(0,1fr);gap:8px 20px;align-items:center}
+.donut{width:150px;height:150px;display:block}
+.donut .dn-v{font-family:var(--mono);font-size:12px;font-weight:600;fill:var(--fg)}
+.donut .dn-l{font-size:7px;fill:var(--muted)}
+.mx-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;min-width:0;max-width:420px}
+.mx-list li{display:grid;grid-template-columns:auto minmax(0,1fr) auto 4.2rem;gap:8px;align-items:baseline;font-size:.88rem}
+.mx-list .sw{align-self:center}
+.mx-n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.mx-v{font-size:.84rem;text-align:right}
+.mx-v small{color:var(--muted);font-size:.76rem}
+.mx-d{text-align:right;font-size:.78rem}
+.d.ok{color:var(--muted)}
+.mx-foot{grid-column:1 / -1}
+@media (max-width:520px){
+  .mix{grid-template-columns:116px minmax(0,1fr);gap:8px 12px}
+  .donut{width:116px;height:116px}
+  .mx-list li{grid-template-columns:auto minmax(0,1fr) auto;row-gap:0;font-size:.84rem}
+  .mx-d{grid-column:2 / -1}
+}
+/* 이번 달 살 것 카드 */
+.buys{display:flex;flex-direction:column;gap:8px}
+.buy{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"c n a" "c q q" "c p p";gap:6px 10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.buy.ro{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n a" "q q"}
+.buy.off{opacity:.55}
+.buy.off .buy-amt{text-decoration:line-through}
+.buy-chk{grid-area:c;align-self:start;padding-top:2px}
+.buy-chk input{width:22px;height:22px;margin:0;accent-color:var(--accent);cursor:pointer}
+.buy-name{grid-area:n;display:flex;flex-direction:column;min-width:0}
+.buy-name b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.buy-name small{font-size:.74rem;color:var(--muted)}
+.buy-amt{grid-area:a;font-weight:600;font-size:.92rem;text-align:right}
+.buy-ctrl{grid-area:q;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.84rem}
+.buy-price{grid-area:p;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:.78rem;color:var(--muted)}
+.buy-price:empty{display:none}
+.bp-edit{display:flex;gap:6px;align-items:center}
+.bp-edit input{width:8.5rem;padding:5px 8px}
+.bq-u{color:var(--muted)}
+.bq-u small{font-size:.74rem;color:var(--warn)}
+.stepper{display:inline-flex;align-items:stretch;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.stepper button{border:0;border-radius:0;min-width:44px;min-height:40px;padding:0 10px;font-size:1.05rem;font-weight:600;background:var(--sunk);color:var(--fg)}
+.stepper button:hover{border:0;background:var(--accent-soft)}
+.stepper input{border:0;border-radius:0;width:6.5rem;text-align:center;background:var(--surface);padding:6px 4px}
+.stepper.wide{display:flex}
+.stepper.wide button{font-size:.82rem;min-width:56px}
+.stepper.wide input{flex:1 1 auto;width:auto}
+.f-monthly{grid-column:span 2}
+@media (max-width:520px){.f-monthly{grid-column:1 / -1}}
+.buy-foot{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.buy-foot .hint b{font-weight:600}
+.add-more summary{list-style:none;cursor:pointer}
+.add-more summary::-webkit-details-marker{display:none}
+.add-more[open] summary{margin-bottom:8px}
+.add-more select{width:auto;max-width:100%}
+/* 접는 구역 */
+details.fold{gap:0}
+details.fold[open]{gap:12px}
+details.fold > summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+details.fold > summary::-webkit-details-marker{display:none}
+details.fold > summary h2::before{content:"▸";display:inline-block;width:1.1em;color:var(--muted);transition:transform .15s}
+details.fold[open] > summary h2::before{transform:rotate(90deg)}
+details.fold > summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:4px}
+details.fold[open] > summary{margin-bottom:0}
+/* 종목 상세 목록 */
+.hold-list{display:flex;flex-direction:column;gap:14px}
+.hl-g{display:flex;flex-direction:column;gap:2px}
+.hl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.hl-g .hl:last-child{border-bottom:0}
+.hl-n{display:flex;flex-direction:column;min-width:0}
+.hl-n b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hl-n small{font-size:.74rem;color:var(--muted);font-family:var(--mono)}
+.hl-v{text-align:right;font-size:.88rem;display:flex;flex-direction:column}
+.hl-v small{font-size:.74rem}
+.hl-bar{grid-column:1 / -1;display:grid;grid-template-columns:minmax(0,1fr) 8.5rem;gap:10px;align-items:center}
+.hl-bar .track{height:12px}
+.hl-p{font-size:.78rem;text-align:right}
+.hl-p small{color:var(--muted)}

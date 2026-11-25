@@ -43,37 +43,33 @@
     </section>
 
     <section class="panel">
-      <div class="panel-head"><h2>그룹 비중</h2><span class="hint">포트폴리오 탭에서 만든 그룹 기준</span></div>
-      <div class="bars" id="classBars"><p class="hint">불러오는 중</p></div>
-    </section>
-
-    <section class="panel">
-      <div class="panel-head"><h2>종목별 비중</h2>
-        <div class="legend"><span><i class="sw" style="background:var(--accent)"></i>현재 비중</span><span><i class="sw" style="background:var(--accent-soft)"></i>허용 밴드</span><span><i class="sw" style="background:var(--target);width:3px"></i>목표</span></div>
-      </div>
-      <div class="bars" id="bars"></div>
-    </section>
-
-    <section class="panel">
-      <div class="panel-head"><h2>보유 현황</h2><span class="hint">평균단가 대비 전일 종가 기준</span></div>
-      <div class="tbl-wrap"><table id="tblHold"></table></div>
+      <div class="panel-head"><h2>그룹 비중</h2><span class="hint">안쪽 현재 · 바깥 목표</span></div>
+      <div class="mix" id="groupMix"><p class="hint">불러오는 중</p></div>
     </section>
 
     <section class="panel" id="secMonthly">
-      <div class="panel-head"><h2>이번 달 적립 배분</h2><span class="hint" id="monthlyHint"></span></div>
-      <div class="tbl-wrap"><table id="tblMonthly"></table></div>
-      <div class="callout" id="monthlyNote"></div>
-      <div class="apply-row"><button class="primary" type="button" data-apply="monthly">체결 반영</button><span class="hint">실제로 산 수량과 체결가를 확인해 보유 자산에 한 번에 반영합니다.</span></div>
+      <div class="panel-head"><h2>이번 달 살 것</h2><span class="hint" id="monthlyHint"></span></div>
+      <div class="buys" id="buyList"></div>
+      <p class="hint" id="holdLine"></p>
+      <div class="buy-foot" id="buyFoot"></div>
       <div class="apply-slot" data-slot="monthly"></div>
     </section>
 
-    <section class="panel" id="secAnnual">
-      <div class="panel-head"><h2>1월 정기 리밸런싱</h2><span class="hint">이번 달 적립금 포함, 목표 비중으로 맞추는 매매안</span></div>
-      <div class="tbl-wrap"><table id="tblAnnual"></table></div>
+    <details class="panel fold" id="secDetail">
+      <summary><h2>종목 상세</h2><span class="hint" id="detailHint"></span></summary>
+      <div class="legend"><span><i class="sw" style="background:var(--accent)"></i>현재 비중</span><span><i class="sw" style="background:var(--accent-soft)"></i>허용 밴드</span><span><i class="sw" style="background:var(--target);width:3px"></i>목표</span></div>
+      <div class="hold-list" id="holdList"></div>
+    </details>
+
+    <details class="panel fold" id="secAnnual">
+      <summary><h2>1월 정기 리밸런싱</h2><span class="hint" id="annualHint"></span></summary>
+      <p class="hint">이번 달 적립금 포함, 목표 비중으로 맞추는 매매안입니다.</p>
+      <div class="buys" id="annualList"></div>
+      <p class="hint" id="annualHold"></p>
       <div class="callout" id="annualNote"></div>
       <div class="apply-row"><button class="primary" type="button" data-apply="annual">체결 반영</button><span class="hint">매도·매수 체결을 확인해 반영합니다.</span></div>
       <div class="apply-slot" data-slot="annual"></div>
-    </section>
+    </details>
   </div>
 
   <!-- 포트폴리오 -->
@@ -87,7 +83,9 @@
       </div>
       <p class="hint">매달 정해진 금액을 넣으면, 목표 비중보다 부족한 종목부터 채우도록 몇 주씩 살지 계산합니다.</p>
       <div class="settings">
-        <div class="field"><label for="monthly">월 적립금 (원)</label><input id="monthly" class="num" type="number" step="10000" inputmode="numeric"></div>
+        <div class="field f-monthly"><label for="monthly">월 적립금 (원) <span class="num" id="monthlyRead"></span></label>
+          <div class="stepper wide"><button type="button" data-mstep="-100000" aria-label="10만 원 줄이기">−10만</button><input id="monthly" class="num" type="number" step="10000" inputmode="numeric"><button type="button" data-mstep="100000" aria-label="10만 원 늘리기">+10만</button></div>
+        </div>
         <div class="field"><label for="carry">이월 현금 (원)</label><input id="carry" class="num" type="number" step="1000" inputmode="numeric"></div>
         <div class="field"><label for="bandIn">허용 밴드 (±%p)</label><input id="bandIn" class="num" type="number" step="0.5" min="0.5" inputmode="decimal"></div>
       </div>
