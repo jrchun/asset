@@ -411,3 +411,14 @@ details.help p{margin:8px 0 0}
 /* 차이 칸은 숨기고 현재 값 색으로 표시(어느 폭에서든 그룹 이름이 보이게) */
 .mx-list li{grid-template-columns:auto minmax(0,1fr) auto}
 .mx-d,.mx-h span:last-child{display:none}
+/* 리밸런싱 탭 */
+.rb-top{display:flex;gap:8px 14px;align-items:center;flex-wrap:wrap}
+.rb-top .hint{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
+.rb-top .hint b{color:var(--fg);font-weight:600}
+.gl-st .linkbtn{font-size:.78rem}
+@media (max-width:520px){
+  .tabs{width:100%}
+  .tab{flex:1 1 0;padding:6px 2px;font-size:.84rem;white-space:nowrap}
+}
+/* '매수' 표시(.act.buy)가 카드 스타일(.buy)을 물려받지 않게 */
+.act.buy{display:inline-block;padding:1px 8px;border:0;border-radius:4px;background:var(--ok-soft);color:var(--ok);grid-template-columns:none;grid-template-areas:none}

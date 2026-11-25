@@ -7,7 +7,7 @@ import {
 } from './rebalance.js';
 import { won, wonShort, signedWon, pct, spct, pp, esc, fmtQty, fmtLocal, unitWord, qtyText, capText, usd } from './format.js';
 import { indexSymbols, search } from './search.js';
-import { donutSegments, draftFromPlan, stepQty, qtyFromAmount, draftTrades, byAmount, annualOpenByDefault } from './draft.js';
+import { donutSegments, draftFromPlan, stepQty, qtyFromAmount, draftTrades, byAmount, CYCLES, cycleOf, rebalanceSchedule } from './draft.js';
 
 const $ = id => document.getElementById(id);
 
@@ -119,7 +119,8 @@ function renderBoard() {
   $('planHint').textContent = `월 ${wonShort(b.C)} · 밴드 ±${band}%p${b.carry ? ' · 이월 ' + wonShort(b.carry) : ''}`;
   renderGroupMix(b);
   renderBuys(b);
-  renderAnnual(b);
+  const sch = renderAnnual(b);
+  if (sch.due || b.status === 'bad') $('sStatusSub').innerHTML += `<br><a class="linkbtn" href="#rebalance">${sch.due ? '이번 달 정기 리밸런싱' : '리밸런싱 필요'} →</a>`;
 }
 
 // 그룹 비중: 도넛(안쪽 현재, 바깥 목표) + 그룹별 한 줄
@@ -222,7 +223,6 @@ function updateCard(card, r) {
 }
 
 // 1월 정기 리밸런싱: 매매가 있는 종목만. 12·1월이거나 리밸런싱 필요 상태면 펼쳐 둔다.
-let annualTouched = false;
 function renderAnnual(b) {
   const { act, sells, buys, usGain, rest } = b.annual;
   const items = b.A.map((a, i) => [a, i]).filter(([, i]) => act[i]);
@@ -239,9 +239,16 @@ function renderAnnual(b) {
     ? ` 미국 상장 자산 매도로 생기는 양도차익은 약 <b>${won(usGain)}</b>입니다(현재 환율로 단순 환산). 연 250만 원 공제를 넘는 부분은 22% 과세 대상입니다.`
     : '';
   $('annualNote').innerHTML = `매도 <b>${won(sells)}</b> · 매수 <b>${won(buys)}</b> · 적립금·이월 현금 <b>${won(b.budget)}</b> 반영 후 남는 현금 <b>${won(rest)}</b>. 매도 대금이 들어온 뒤 매수하세요.${taxLine}`;
-  if (!annualTouched) $('secAnnual').open = annualOpenByDefault(new Date().getMonth() + 1, b.status) || tradeKind === 'annual';
+  const cyc = cycleOf(state), now = new Date(), sch = rebalanceSchedule(cyc, now.getFullYear(), now.getMonth() + 1);
+  document.querySelectorAll('#cycleSeg [data-cycle]').forEach(bn => bn.setAttribute('aria-pressed', bn.dataset.cycle === cyc));
+  $('rbNext').textContent = sch.due ? '이번 달이 리밸런싱하는 달입니다' : `다음 예정 ${sch.next.year}년 ${sch.next.month}월`;
+  $('rbState').innerHTML = `지금 <span class="pill ${b.status}">${STATUS_LABEL[b.status]}</span> 최대 이탈 <b class="num">${b.md.toFixed(1)}%p</b> (밴드 ±${b.band}%p)`;
+  return sch;
 }
-$('secAnnual').querySelector('summary').addEventListener('click', () => { annualTouched = true; });
+$('cycleSeg').addEventListener('click', e => {
+  const c = e.target.closest('[data-cycle]')?.dataset.cycle; if (!c || !CYCLES[c]) return;
+  state.cycle = c; renderBoard(); edited();
+});
 
 // 이번 달 살 것: 체크·−/+·직접 입력·가격 다름
 const draftRow = el => { const c = el.closest('.buy[data-b]'); return c ? [draft[+c.dataset.b], c] : [null, null]; };
@@ -615,6 +622,7 @@ function refreshSoon() {
 $('priceLine').addEventListener('click', e => { if (e.target.id === 'refreshBtn') refreshPrices(); });
 
 /* ---------- 체결 반영 ---------- */
+const onTrade = (ev, fn) => ['board', 'rebalance'].forEach(id => $(id).addEventListener(ev, fn));
 let tradeKind = null, tradeRows = [];
 function planRows(kind) {
   const b = lastBoard, P = prices(); if (!b) return [];
@@ -673,15 +681,15 @@ function openTrade(kind) {
 }
 function closeTrade() { tradeKind = null; tradeRows = []; renderTradePanel(); }
 document.querySelectorAll('[data-apply]').forEach(bn => bn.addEventListener('click', () => openTrade(bn.dataset.apply)));
-$('board').addEventListener('input', e => {
+onTrade('input', e => {
   const row = e.target.closest('.trow'); const k = e.target.dataset.tk; if (!row || !k) return;
   tradeRows[+row.dataset.t][k] = e.target.value;
   $('tradeSum').innerHTML = tradeSumHtml(tradeTotals());
 });
-$('board').addEventListener('change', e => {
+onTrade('change', e => {
   if (e.target.dataset.tk === 'side') renderTradePanel();
 });
-$('board').addEventListener('click', async e => {
+onTrade('click', async e => {
   const t = e.target;
   if (t.dataset.tdel !== undefined) { tradeRows.splice(+t.dataset.tdel, 1); renderTradePanel(); return; }
   if (t.id === 'tAdd') {
@@ -735,7 +743,7 @@ async function undo() {
 }
 
 /* ---------- 탭 ---------- */
-const TABS = ['board', 'portfolio', 'holdings'];
+const TABS = ['board', 'rebalance', 'portfolio', 'holdings'];
 function showTab(name) {
   const t = TABS.includes(name) ? name : 'board';
   TABS.forEach(k => { $(k).hidden = k !== t; $('tab-' + k).setAttribute('aria-selected', k === t); });

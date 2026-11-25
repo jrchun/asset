@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { computeBoard, ensureGroups } from '../web/js/rebalance.js';
-import { donutSegments, draftFromPlan, stepQty, qtyFromAmount, draftTrades, annualOpenByDefault } from '../web/js/draft.js';
+import { donutSegments, draftFromPlan, stepQty, qtyFromAmount, draftTrades, rebalanceSchedule, cycleOf } from '../web/js/draft.js';
 
 const load = name => JSON.parse(readFileSync(new URL('../data/' + name, import.meta.url), 'utf8'));
 
@@ -43,9 +43,11 @@ test('수량 조절: 주식은 1주씩, 코인은 1만 원어치씩', () => {
   assert.equal(qtyFromAmount({ market: 'US', unit: 1 }, 2000, 1, 1000), 2, '달러 자산은 환율 적용');
 });
 
-test('1월 리밸런싱 펼침 조건', () => {
-  assert.equal(annualOpenByDefault(1, 'ok'), true);
-  assert.equal(annualOpenByDefault(12, 'ok'), true);
-  assert.equal(annualOpenByDefault(6, 'warn'), false);
-  assert.equal(annualOpenByDefault(6, 'bad'), true);
+test('정기 리밸런싱 주기: 이번 달 여부와 다음 예정 달', () => {
+  assert.deepEqual(rebalanceSchedule('quarter', 2026, 11), { due: false, next: { year: 2027, month: 1 } });
+  assert.deepEqual(rebalanceSchedule('quarter', 2026, 4), { due: true, next: { year: 2026, month: 7 } });
+  assert.deepEqual(rebalanceSchedule('half', 2026, 3), { due: false, next: { year: 2026, month: 7 } });
+  assert.deepEqual(rebalanceSchedule('year', 2026, 1), { due: true, next: { year: 2027, month: 1 } });
+  assert.equal(cycleOf({}), 'quarter', '정하지 않았으면 분기');
+  assert.equal(cycleOf({ cycle: 'half' }), 'half');
 });
