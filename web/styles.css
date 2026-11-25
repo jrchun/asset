@@ -24,7 +24,9 @@
   --k1:#6f9ee8; --k2:#4fc2ae; --k3:#a892e6; --k4:#e0b04f; --k5:#d98c66; --k6:#9aa6b2; --k7:#f07b63;
   --target:#e3e9ef; color-scheme:dark}
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55;
+  /* 한글은 단어(띄어쓰기) 단위로 줄을 바꾼다(기본값은 글자 중간에서 끊김). 긴 주소 등은 넘치기 전에만 자른다. */
+  word-break:keep-all;overflow-wrap:break-word}
 .wrap{max-width:880px;margin:0 auto;padding-block:20px 48px;
   padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
   display:flex;flex-direction:column;gap:20px}
