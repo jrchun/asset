@@ -58,9 +58,14 @@ function kstTime(iso) {
 }
 
 /* ---------- 저장 ---------- */
+let statusTimer = null;
 const sync = createDocSync({
   render(doc, opts) { applyPortfolio(doc, opts && opts.force); },
-  status(text) { $('saveState').textContent = text; },
+  status(text) {
+    // '저장됨'은 3초 뒤 지운다(대시보드를 한 화면에 두기 위해). 오류·안내 문구는 남긴다.
+    $('saveState').textContent = text; clearTimeout(statusTimer);
+    if (text === '저장됨') statusTimer = setTimeout(() => { if ($('saveState').textContent === '저장됨') $('saveState').textContent = ''; }, 3000);
+  },
   needToken({ firstTime, minLength, hubLogin } = {}) {
     if (hubLogin) { // 허브 로그인: 로그인한 뒤 이 화면으로 돌아온다
       $('hubLogin').href = hubLogin + '&return=' + encodeURIComponent(location.href);
@@ -86,7 +91,7 @@ function renderPriceLine() {
   else if (P.asOf) parts.push(`<span>수집 <b>${esc(kstTime(P.asOf))}</b></span>`);
   else parts.push('<span>가격 정보가 아직 없습니다</span>');
   if (fx) parts.push(`<span>환율 <b>${fx.toLocaleString('ko-KR')}</b>원${P.fxDate ? ' · ' + esc(md(P.fxDate)) : ''}</span>`);
-  if (!P.example) parts.push('<button type="button" id="refreshBtn">가격 새로고침</button>');
+  if (!P.example) parts.push('<button type="button" id="refreshBtn" aria-label="가격 새로고침">↻ 새로고침</button>');
   $('priceLine').innerHTML = parts.join('');
 }
 
@@ -106,11 +111,12 @@ function renderBoard() {
 
   const { T, TC, pl, exVal, band, units, uDrift, mdIdx } = b;
   $('sTotal').textContent = wonShort(T);
-  $('sPL').innerHTML = (TC ? `<span class="${pl >= 0 ? 'up' : 'down'}">${signedWon(pl)} (${spct(pl / TC * 100)})</span>` : '') + (exVal ? `<br>제외 자산 포함 ${wonShort(T + exVal)}` : '');
+  $('sPL').innerHTML = (TC ? `<span class="${pl >= 0 ? 'up' : 'down'}">${pl < 0 ? '' : '+'}${wonShort(pl)} (${spct(pl / TC * 100)})</span>` : '') + (exVal ? `${TC ? ' · ' : ''}제외 포함 ${wonShort(T + exVal)}` : '');
   $('sStatus').innerHTML = `<span class="pill ${b.status}">${STATUS_LABEL[b.status]}</span>`;
-  const mo = b.months.kind === 'months' ? `적립만으로 ${b.months.months >= 120 ? '10년+' : b.months.months + '개월'}` : '';
-  $('sStatusSub').innerHTML = `최대 이탈 <b class="num">${b.md.toFixed(1)}%p</b>${units.length ? ` (${esc(units[mdIdx].label)})` : ''} · 밴드 ±${band}%p${mo ? '<br>' + mo : ''}`;
-
+  const far = b.groupRows.filter(r => r.id !== null && Math.abs(r.cur - r.tgt) > band).length;
+  const mo = b.months.kind === 'months' ? ` · 적립만으로 ${b.months.months >= 120 ? '10년+' : b.months.months + '개월'}` : '';
+  $('sStatusSub').innerHTML = (far ? `${far}개 그룹 밴드 밖` : `모두 밴드 ±${band}%p 안`) + mo;
+  $('planHint').textContent = `월 ${wonShort(b.C)} · 밴드 ±${band}%p${b.carry ? ' · 이월 ' + wonShort(b.carry) : ''}`;
   renderGroupMix(b);
   renderBuys(b);
   renderAnnual(b);
@@ -123,8 +129,7 @@ function renderGroupMix(b) {
   const colorOf = r => { const gi = (state.groups || []).findIndex(g => g.id === r.id); return gi < 0 ? 'var(--k6)' : GCOLORS[gi % GCOLORS.length]; };
   const ring = (vals, r, w, op) => donutSegments(vals).map((s, k) => s.len > 0
     ? `<circle r="${r}" cx="50" cy="50" pathLength="100" fill="none" stroke="${colorOf(rows[k])}" stroke-width="${w}" stroke-opacity="${op}" stroke-dasharray="${s.len} ${100 - s.len}" stroke-dashoffset="${-s.start}"/>` : '').join('');
-  const far = rows.filter(r => r.id !== null && Math.abs(r.cur - r.tgt) > band).length;
-  const svg = `<svg class="donut" viewBox="0 0 100 100" role="img" aria-label="그룹 비중 도넛: ${rows.map(r => `${esc(r.name)} 현재 ${pct(r.cur)} 목표 ${pct(r.tgt)}`).join(', ')}">
+  const svg = `<svg class="donut" viewBox="0 0 100 100" role="img" aria-label="그룹 비중 도넛(안쪽 현재, 바깥 목표): ${rows.map(r => `${esc(r.name)} 현재 ${pct(r.cur)} 목표 ${pct(r.tgt)}`).join(', ')}">
     <g transform="rotate(-90 50 50)">${ring(rows.map(r => r.tgt), 45, 5, .45)}${ring(rows.map(r => r.cur), 32, 16, 1)}</g>
     <text x="50" y="47" text-anchor="middle" class="dn-v">${b.md.toFixed(1)}%p</text>
     <text x="50" y="59" text-anchor="middle" class="dn-l">최대 이탈</text></svg>`;
@@ -134,8 +139,7 @@ function renderGroupMix(b) {
     return `<li><i class="sw" style="background:${colorOf(r)}"></i><span class="mx-n">${esc(r.name)}</span>
       <span class="mx-v num"><span class="d ${dcls}">${pct(r.cur)}</span><small> / ${pct(r.tgt)}</small></span><span class="mx-d num d ${dcls}">${pp(d)}</span></li>`;
   }).join('');
-  $('groupMix').innerHTML = `${svg}<ul class="mx-list">${list}</ul>` +
-    `<p class="hint mx-foot">${far ? `<span class="warnline">${far}개 그룹이 허용 밴드(±${band}%p)를 벗어났습니다.</span>` : `모든 그룹이 허용 밴드(±${band}%p) 안에 있습니다.`}</p>`;
+  $('groupMix').innerHTML = `<figure class="dn-fig" title="안쪽 현재 · 바깥 목표">${svg}</figure><ul class="mx-list"><li class="mx-h"><span></span><span>그룹</span><span>현재 / 목표</span><span>차이</span></li>${list}</ul>`;
 }
 
 // 이번 달 살 것: 살 종목만 카드로. 체크·수량 조절 후 한 번에 반영한다.
@@ -144,10 +148,10 @@ const assetBy = t => (state.assets || []).find(a => keyOf(a) === t);
 function renderBuys(b) {
   const P = prices(), fx = fxOf(P) || 0;
   const { plan, units, UA, budget, carry, C } = b;
-  $('monthlyHint').textContent = budget > 0 ? `예산 ${wonShort(budget)}` + (carry ? ` (적립 ${wonShort(C)} + 이월 ${wonShort(carry)})` : '') : '';
+  $('monthlyHint').textContent = '';
   if (!(budget > 0)) {
     $('buyList').innerHTML = '<p class="hint">포트폴리오 탭에서 월 적립금을 입력하면 이번 달 살 종목을 계산합니다.</p>';
-    $('holdBox').hidden = true; $('buyFoot').innerHTML = ''; return;
+    $('holdBox').hidden = true; $('buyFoot').innerHTML = ''; $('buyLines').innerHTML = ''; $('buyMore').innerHTML = ''; return;
   }
   draft = draftFromPlan(b, P, draft);
   const unitOf = t => units.find((u, i) => keyOf(UA[i]) === t);
@@ -179,21 +183,32 @@ function renderBuys(b) {
   $('holdLine').innerHTML = holds.map(([, i]) => esc(UA[i].name)).join(', ') + (blocked.length ? `<br>${blocked.join(', ')}은(는) 배정액이 1주 가격보다 작아 보류했습니다. 부족분이 쌓이면 다음 달에 우선 배정됩니다.` : '');
   renderBuyFoot();
 }
+let buyEditing = false;
 function renderBuyFoot() {
   const opt = state.assets.filter(a => !a.exclude && !draft.some(r => r.ticker === keyOf(a))).map(a => `<option value="${esc(keyOf(a))}">${esc(a.name)}</option>`).join('');
-  $('buyFoot').innerHTML = `<div class="trade-sum" id="buySum"></div>
-    <p class="hint">계획대로 사면 최대 이탈 <b class="num">${lastBoard.md.toFixed(1)}%p → ${lastBoard.md2.toFixed(1)}%p</b></p>
-    <p class="err" id="buyErr" hidden></p>
-    <div class="row"><button class="primary" type="button" id="buyApply"></button>
-      ${opt ? `<details class="add-more"><summary class="linkbtn">다른 종목도 샀어요</summary><div class="row"><select id="buyAddSel" aria-label="추가할 종목">${opt}</select><button type="button" id="buyAdd">추가</button></div></details>` : ''}</div>`;
+  $('buyMore').innerHTML = `<p class="hint">계획대로 사면 최대 이탈 <b class="num">${lastBoard.md.toFixed(1)}%p → ${lastBoard.md2.toFixed(1)}%p</b></p>` +
+    (opt ? `<details class="add-more"><summary class="linkbtn">다른 종목도 샀어요</summary><div class="row"><select id="buyAddSel" aria-label="추가할 종목">${opt}</select><button type="button" id="buyAdd">추가</button></div></details>` : '');
+  $('buyFoot').innerHTML = `<p class="err" id="buyErr" hidden></p>
+    <div class="row"><button class="primary" type="button" id="buyApply"></button><button type="button" id="buyEditBtn" aria-expanded="${buyEditing}" aria-controls="buyEdit">${buyEditing ? '고치기 닫기' : '수량 고치기'}</button></div>`;
+  $('buyEdit').hidden = !buyEditing; $('buyLines').hidden = buyEditing;
   updateBuyFoot();
+}
+// 한눈에 보는 한 줄 목록(체크·수량을 고치면 함께 바뀐다)
+function renderBuyLines() {
+  const fx = fxOf(prices()) || 0;
+  $('buyLines').innerHTML = draft.map(r => {
+    const a = assetBy(r.ticker); if (!a) return '';
+    const krw = (+r.qty || 0) * (a.market === 'CASH' ? 1 : +r.price || 0) * (isUSD(a) ? fx : 1);
+    return `<li class="${r.on ? '' : 'off'}"><span class="bl-n">${esc(a.name)}</span><span class="bl-q num">${qtyText(+r.qty || 0, a)}</span><span class="bl-a num">${won(krw)}</span></li>`;
+  }).join('') || '<li class="hint">이번 달은 살 종목이 없습니다.</li>';
 }
 // 합계와 버튼 글자만 바꾼다(버튼 자체는 그대로 두어 누르는 중인 클릭이 사라지지 않게)
 function updateBuyFoot() {
   const b = lastBoard, fx = fxOf(prices()) || 0;
   const t = draftTrades(draft, state.assets, { fx, budget: b.budget }), n = t.trades.length, over = t.spent > b.budget + 1;
-  $('buySum').innerHTML = `<span>매수 <b>${won(t.spent)}</b></span><span>남는 현금(다음 달 이월) <b class="${over ? 'warnline' : ''}">${over ? '예산 초과 ' + won(t.spent - b.budget) : won(t.carry)}</b></span>`;
-  const bn = $('buyApply'); bn.disabled = !n || draftBusy; bn.textContent = draftBusy ? '반영하는 중…' : n ? `체크한 ${n}종목 반영` : '반영할 종목 없음';
+  $('monthlyHint').innerHTML = `예산 ${wonShort(b.budget)} · ${over ? `<span class="warnline">초과 ${won(t.spent - b.budget)}</span>` : `남는 현금 <b class="num">${won(t.carry)}</b>`}`;
+  renderBuyLines();
+  const bn = $('buyApply'); bn.disabled = !n || draftBusy; bn.textContent = draftBusy ? '반영하는 중…' : !n ? '반영할 종목 없음' : draft.some(r => r.touched) ? `${n}종목 반영` : `계획대로 ${n}종목 반영`;
 }
 // 카드 하나의 금액·수량 표시만 바꾼다
 function updateCard(card, r) {
@@ -255,14 +270,17 @@ function readBuyInput(e) {
 }
 $('buyList').addEventListener('input', readBuyInput);
 $('buyList').addEventListener('change', readBuyInput);
-$('buyFoot').addEventListener('click', async e => {
+$('buyFoot').addEventListener('click', e => {
+  if (e.target.id === 'buyEditBtn') { buyEditing = !buyEditing; renderBuyFoot(); if (buyEditing) $('buyEdit').scrollIntoView({ block: 'nearest' }); }
+});
+$('buyMore').addEventListener('click', e => {
   if (e.target.id === 'buyAdd') {
     const t = $('buyAddSel').value, a = assetBy(t); if (!a) return;
     draft.push({ ticker: t, on: true, qty: a.market === 'CASH' ? 0 : floorTo(1, +a.unit || 1), plan: null, price: localPrice(prices(), a), touched: true, extra: true });
-    renderBuys(lastBoard); return;
+    renderBuys(lastBoard);
   }
-  if (e.target.id === 'buyApply') await submitDraft();
 });
+$('buyFoot').addEventListener('click', async e => { if (e.target.id === 'buyApply') await submitDraft(); });
 async function submitDraft() {
   const err = $('buyErr');
   if (state.example) { err.hidden = false; err.textContent = '예시 데이터에는 체결을 반영할 수 없습니다. 보유 자산 탭에서 내 종목을 추가해 주세요.'; return; }
@@ -276,7 +294,7 @@ async function submitDraft() {
   if (r.unauthorized) { updateBuyFoot(); $('buyErr').hidden = false; $('buyErr').textContent = '반영하려면 아래에서 로그인한 뒤 다시 눌러 주세요.'; sync.askForToken(); return; }
   if (r.conflict) { draft = []; sync.replace(r.doc, r.version); $('saveState').textContent = '다른 기기에서 수정돼 새로 불러왔습니다. 확인하고 다시 반영해 주세요.'; return; }
   if (!r.ok) { updateBuyFoot(); $('buyErr').hidden = false; $('buyErr').textContent = r.error; return; }
-  draft = [];
+  draft = []; buyEditing = false;
   sync.replace(r.doc, r.version);
   $('saveState').textContent = '체결을 반영했습니다';
   showUndo('monthly', r.batch, r.spent, r.proceeds);

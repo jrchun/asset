@@ -35,20 +35,22 @@
   <!-- 대시보드 -->
   <div class="view" id="board" role="tabpanel" aria-labelledby="tab-board">
     <div class="callout warn" id="priceWarn" hidden></div>
-    <section class="summary" aria-label="요약">
-      <div class="stat"><span class="label">총 평가액</span><span class="v" id="sTotal">–</span><span class="s" id="sPL"></span></div>
-      <div class="stat"><span class="label">상태</span><span id="sStatus"></span><span class="s" id="sStatusSub"></span></div>
-    </section>
-
-    <section class="panel">
-      <div class="panel-head"><h2>그룹 비중</h2><span class="hint">안쪽 현재 · 바깥 목표</span></div>
+    <section class="panel glance" aria-label="현황">
+      <div class="gl-top">
+        <div class="gl-total"><span class="label">총 평가액</span><span class="v num" id="sTotal">–</span><span class="s" id="sPL"></span></div>
+        <div class="gl-st"><span id="sStatus"></span><span class="s" id="sStatusSub"></span></div>
+      </div>
       <div class="mix" id="groupMix"><p class="hint">불러오는 중</p></div>
     </section>
 
     <section class="panel" id="secMonthly">
       <div class="panel-head"><h2>이번 달 살 것</h2><span class="hint" id="monthlyHint"></span></div>
-      <div class="buys" id="buyList"></div>
-      <details class="holds" id="holdBox" hidden><summary class="hint" id="holdSum"></summary><p class="hint" id="holdLine"></p></details>
+      <ul class="buy-lines" id="buyLines"></ul>
+      <div class="buy-edit" id="buyEdit" hidden>
+        <div class="buys" id="buyList"></div>
+        <details class="holds" id="holdBox" hidden><summary class="hint" id="holdSum"></summary><p class="hint" id="holdLine"></p></details>
+        <div id="buyMore"></div>
+      </div>
       <div class="buy-foot" id="buyFoot"></div>
       <div class="apply-slot" data-slot="monthly"></div>
     </section>
@@ -66,8 +68,9 @@
 
   <!-- 포트폴리오 -->
   <div class="view" id="portfolio" role="tabpanel" aria-labelledby="tab-portfolio" hidden>
-    <section class="panel" aria-label="적립 설정">
-      <div class="panel-head"><h2>적립 방식</h2>
+    <details class="panel fold" id="secPlan" aria-label="적립 설정">
+      <summary><h2>적립 방식</h2><span class="hint" id="planHint"></span></summary>
+      <div class="panel-head">
         <div class="seg" role="group" aria-label="적립 방식">
           <button type="button" aria-pressed="true">정액식</button>
           <button type="button" aria-pressed="false" disabled>정량식<small>준비 중</small></button>
@@ -81,7 +84,7 @@
         <div class="field"><label for="bandIn">허용 밴드 (±%p)</label><input id="bandIn" class="num" type="number" step="0.5" min="0.5" inputmode="decimal"></div>
       </div>
       <p class="hint">매달 적립금으로 목표보다 부족한 종목부터 채웁니다. 이월 현금은 지난달 1주 단위로 끊고 남은 돈이며 체결 반영 때 자동으로 바뀝니다.</p>
-    </section>
+    </details>
 
     <section class="panel">
       <div class="panel-head"><h2>그룹과 목표 비중</h2><span class="hint" id="tgtSum"></span></div>

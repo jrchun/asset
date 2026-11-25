@@ -351,3 +351,63 @@ details.help p{margin:8px 0 0}
 }
 #targets:not(.moving) .cls-sel{display:none}
 #targets:not(.moving) .mem .meta:not(:has(.sub-code)){display:none}
+/* 4차: 대시보드 한 화면 */
+#board{gap:12px}
+.glance{gap:12px}
+.gl-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px 16px;flex-wrap:wrap}
+.gl-total{display:flex;flex-direction:column;gap:2px;min-width:0}
+.gl-total .v{font-size:1.35rem;font-weight:600;line-height:1.2}
+.gl-total .s,.gl-st .s{font-size:.78rem;color:var(--muted)}
+.gl-st{display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}
+.dn-fig{margin:0;display:flex;flex-direction:column;align-items:center;gap:2px}
+.dn-fig figcaption{font-size:.68rem;color:var(--muted);white-space:nowrap}
+.mx-h{font-size:.68rem!important;color:var(--muted);font-weight:600;letter-spacing:.04em}
+.mx-h span:nth-child(n+3){text-align:right}
+.mx-list{gap:4px}
+.buy-lines{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.buy-lines li{display:grid;grid-template-columns:minmax(0,1fr) auto 6.8rem;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);font-size:.9rem}
+.buy-lines li:last-child{border-bottom:0}
+.buy-lines li.off{opacity:.5;text-decoration:line-through}
+.bl-n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.bl-q{color:var(--muted);font-size:.82rem}
+.bl-a{text-align:right;font-weight:600}
+.buy-edit{display:flex;flex-direction:column;gap:8px}
+.buy-foot{padding-top:8px}
+#secMonthly{gap:8px}
+#secAnnual > summary h2{font-size:.95rem}
+#secAnnual:not([open]){padding-block:12px}
+@media (max-width:520px){
+  .wrap{padding-block:14px 20px;gap:12px}
+  h1{font-size:1.2rem}
+  header{gap:8px!important}
+  .tab{padding:6px 14px;min-height:34px}
+  .priceline{font-size:.74rem;gap:6px}
+  .priceline button{min-height:28px;padding:2px 8px;font-size:.74rem}
+  .panel{padding:12px 14px}
+  .buy-lines li{grid-template-columns:minmax(0,1fr) auto 6.2rem;font-size:.86rem;padding:5px 0}
+  .mx-list li{grid-template-columns:auto minmax(0,1fr) auto}
+  .mx-h span:last-child{display:none}
+}
+@media (min-width:900px){
+  #board{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}
+  #board > #priceWarn,#board > #secAnnual{grid-column:1 / -1}
+  #board .mix{grid-template-columns:140px minmax(0,1fr)}
+  #board .donut{width:140px;height:140px}
+}
+/* 포트폴리오: 적립 방식 접기 */
+#secPlan > summary h2{font-size:1.05rem}
+#monthlyHint b{font-weight:600;color:var(--fg)}
+.buy-foot{padding-top:4px;border-top:0}
+.buy-lines{border-bottom:1px solid var(--line);padding-bottom:4px}
+@media (max-width:520px){
+  header h1{display:none}
+  header > .row:first-child:has(#exampleTag[hidden]){display:none}
+  .mx-list{gap:2px}
+  .glance{gap:8px}
+}
+/* 저장 상태가 비어 있고 로그인 안내도 없으면 바닥 줄을 숨긴다 */
+.foot:has(#saveState:empty):has(#hubLoginBox[hidden]):has(#tokenForm[hidden]){display:none}
+@media (max-width:520px){.wrap{padding-bottom:12px}}
+/* 차이 칸은 숨기고 현재 값 색으로 표시(어느 폭에서든 그룹 이름이 보이게) */
+.mx-list li{grid-template-columns:auto minmax(0,1fr) auto}
+.mx-d,.mx-h span:last-child{display:none}
