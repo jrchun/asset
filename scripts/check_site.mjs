@@ -63,7 +63,7 @@ await hub('앱 허브: 자기소개서 (/app.json)', async () => {
   const j = await r.json().catch(() => null); expect(j && typeof j === 'object', 'JSON이 아님');
   const missing = ['schema', 'name', 'summary', 'status'].filter(k => !j[k]);
   expect(!missing.length, '빠진 필드: ' + missing.join(', '));
-  return `${j.emoji || ''} ${j.name} · ${j.status}`.trim();
+  return `${j.name} · ${j.status}`;
 });
 await hub('앱 허브: 버전 (/api/health의 starter)', async () => {
   expect(health.starter, 'starter 값이 없음 — 허브 준비 전 예전 앱(docs/HUB.md 2번)');

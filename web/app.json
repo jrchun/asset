@@ -1,7 +1,6 @@
 {
   "schema": 1,
   "name": "리밸런싱 보드",
-  "emoji": "⚖️",
   "summary": "그룹별 목표 비중에 맞춰 이번 달 적립 배분을 계산",
   "category": "돈",
   "status": "운영중",
