@@ -87,19 +87,20 @@
     <details class="panel fold" id="secPlan" aria-label="적립 설정">
       <summary><h2>적립 방식</h2><span class="hint" id="planHint"></span></summary>
       <div class="panel-head">
-        <div class="seg" role="group" aria-label="적립 방식">
-          <button type="button" aria-pressed="true">정액식</button>
-          <button type="button" aria-pressed="false" disabled>정량식<small>준비 중</small></button>
+        <div class="seg" role="group" aria-label="적립 방식" id="contribSeg">
+          <button type="button" data-contrib="fixed" aria-pressed="false">그룹별 금액</button>
+          <button type="button" data-contrib="deficit" aria-pressed="false">부족분 채우기</button>
         </div>
       </div>
       <div class="settings">
-        <div class="field f-monthly"><label for="monthly">월 적립금 (원) <span class="num" id="monthlyRead"></span></label>
+        <div class="field f-monthly" id="monthlyField"><label for="monthly">월 적립금 (원) <span class="num" id="monthlyRead"></span></label>
           <div class="stepper wide"><button type="button" data-mstep="-100000" aria-label="10만 원 줄이기">−10만</button><input id="monthly" class="num" type="number" step="10000" inputmode="numeric"><button type="button" data-mstep="100000" aria-label="10만 원 늘리기">+10만</button></div>
         </div>
         <div class="field"><label for="carry">이월 현금 (원)</label><input id="carry" class="num" type="number" step="1000" inputmode="numeric"></div>
         <div class="field"><label for="bandIn">허용 밴드 (±%p)</label><input id="bandIn" class="num" type="number" step="0.5" min="0.5" inputmode="decimal"></div>
       </div>
-      <p class="hint">매달 적립금으로 목표보다 부족한 종목부터 채웁니다. 이월 현금은 지난달 1주 단위로 끊고 남은 돈이며 체결 반영 때 자동으로 바뀝니다.</p>
+      <p class="hint" id="contribHint"></p>
+      <p class="hint">이월 현금은 지난달 1주 단위로 끊고 남은 돈이며 체결 반영 때 자동으로 바뀝니다.</p>
     </details>
 
     <section class="panel">

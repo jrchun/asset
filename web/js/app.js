@@ -3,7 +3,7 @@
 import { createDocSync } from './docsync.js';
 import * as api from './api.js';
 import {
-  keyOf, isUSD, quoteOf, fxOf, krwPrice, localPrice, ensureGroups, computeBoard, targetSum, STATUS_LABEL, floorTo,
+  keyOf, isUSD, quoteOf, fxOf, krwPrice, localPrice, ensureGroups, computeBoard, targetSum, STATUS_LABEL, floorTo, contribOf, fixedSum,
 } from './rebalance.js';
 import { won, wonShort, signedWon, pct, spct, pp, esc, fmtQty, fmtLocal, unitWord, qtyText, capText, usd } from './format.js';
 import { indexSymbols, search } from './search.js';
@@ -78,7 +78,12 @@ const sync = createDocSync({
     $('tokenForm').hidden = false; $('tokenIn').focus();
   },
 });
-function edited() { state.example = false; sync.edit(() => {}); }
+function edited() {
+  state.example = false;
+  // 그룹별 금액 방식이면 문서의 월 적립금을 그룹 금액 합계로 맞춘다(서버의 체결 반영이 이 값으로 이월 현금을 계산한다).
+  if (contribOf(state) === 'fixed') state.monthly = fixedSum(state);
+  sync.edit(() => {});
+}
 
 /* ---------- 대시보드 ---------- */
 const side = (a, s) => a.market === 'CASH' ? (s > 0 ? '입금' : '출금') : (s > 0 ? '매수' : '매도');
@@ -116,7 +121,7 @@ function renderBoard() {
   const far = b.groupRows.filter(r => r.id !== null && Math.abs(r.cur - r.tgt) > band).length;
   const mo = b.months.kind === 'months' ? ` · 적립만으로 ${b.months.months >= 120 ? '10년+' : b.months.months + '개월'}` : '';
   $('sStatusSub').innerHTML = (far ? `${far}개 그룹 밴드 밖` : `모두 밴드 ±${band}%p 안`) + mo;
-  $('planHint').textContent = `월 ${wonShort(b.C)} · 밴드 ±${band}%p${b.carry ? ' · 이월 ' + wonShort(b.carry) : ''}`;
+  $('planHint').textContent = `${b.contrib === 'fixed' ? '그룹별 금액' : '부족분 채우기'} · 월 ${wonShort(b.C)} · 밴드 ±${band}%p${b.carry ? ' · 이월 ' + wonShort(b.carry) : ''}`;
   renderGroupMix(b);
   renderBuys(b);
   const sch = renderAnnual(b);
@@ -200,7 +205,7 @@ function renderBuyLines() {
   $('buyLines').innerHTML = draft.map(r => {
     const a = assetBy(r.ticker); if (!a) return '';
     const krw = (+r.qty || 0) * (a.market === 'CASH' ? 1 : +r.price || 0) * (isUSD(a) ? fx : 1);
-    return `<li class="${r.on ? '' : 'off'}"><span class="bl-n">${esc(a.name)}</span><span class="bl-q num">${qtyText(+r.qty || 0, a)}</span><span class="bl-a num">${won(krw)}</span></li>`;
+    return `<li class="${r.on ? '' : 'off'}"><span class="bl-n">${esc(a.name)}</span><span class="bl-q num">${a.market === 'CASH' ? '입금' : qtyText(+r.qty || 0, a)}</span><span class="bl-a num">${won(krw)}</span></li>`;
   }).join('') || '<li class="hint">이번 달은 살 종목이 없습니다.</li>';
 }
 // 합계와 버튼 글자만 바꾼다(버튼 자체는 그대로 두어 누르는 중인 클릭이 사라지지 않게)
@@ -439,8 +444,9 @@ function renderTargets() {
         <div class="tgt-in"><input id="gt-${esc(g.id)}" class="num" data-gk="target" type="number" step="0.5" min="0" max="100" inputmode="decimal" value="${g.target ?? 0}" aria-label="${esc(g.name)} 목표 비중"></div>
         <button class="del" type="button" data-gdel="${esc(g.id)}" aria-label="${esc(g.name)} 그룹 삭제">✕</button>
       </div>
+      ${contribOf(state) === 'fixed' ? `<div class="grp-amt"><label for="ga-${esc(g.id)}">매월</label><div class="tgt-in won"><input id="ga-${esc(g.id)}" class="num" data-gk="monthly" type="number" step="10000" min="0" inputmode="numeric" value="${g.monthly ?? 0}" aria-label="${esc(g.name)} 매월 적립 금액"></div><span class="note" data-gamt="${esc(g.id)}"></span></div>` : ''}
       <div class="grp-rule"><span>현재 <b class="num" data-gcur="${esc(g.id)}"></b></span>${multi ? `<label>규칙 <select data-gk="mode"><option value="ratio" ${!lead ? 'selected' : ''}>비율대로 나눠 사기</option><option value="lead" ${lead ? 'selected' : ''}>대표 종목만 사기</option></select></label>
-        ${lead ? `<label>매수 <select data-gk="lead">${opts(g.lead || keyOf(M[0][0]))}</select></label><label>먼저 매도 <select data-gk="sell">${opts(g.sell || g.lead || keyOf(M[0][0]))}</select></label>` : '<span class="note">비율에 못 미치는 종목부터 사고, 넘치는 종목부터 팝니다</span>'}` : ''}</div>
+        ${lead ? `<label>매수 <select data-gk="lead">${opts(g.lead || keyOf(M[0][0]))}</select></label><label>먼저 매도 <select data-gk="sell">${opts(g.sell || g.lead || keyOf(M[0][0]))}</select></label>` : `<span class="note">${contribOf(state) === 'fixed' ? '매월 금액을 아래 비율대로 나눠 사고, 리밸런싱 때는 넘치는 종목부터 팝니다' : '비율에 못 미치는 종목부터 사고, 넘치는 종목부터 팝니다'}</span>`}` : ''}</div>
       ${M.map(([a, i]) => memRow(a, i, multi && !lead)).join('') || '<p class="hint">아직 종목이 없습니다. 다른 그룹이나 미분류의 종목을 이 그룹으로 옮기세요.</p>'}
     </div>`;
   }).join('');
@@ -460,11 +466,37 @@ function renderTargetMeta() {
   const parts = G.map((g, gi) => [g.name, members(g).length ? (+g.target || 0) : 0, GCOLORS[gi % GCOLORS.length]]);
   $('gaugeTrack').innerHTML = parts.map(([l, v, c]) => v > 0 ? `<i style="width:${Math.min(100, v)}%;background:${c}" title="${esc(l)} ${v}%"></i>` : '').join('');
   if ($('groups')) $('groups').innerHTML = parts.filter(p => p[1] > 0).map(([l, v, c]) => `<span><i class="sw" style="background:${c}"></i>${esc(l)} <b>${+v.toFixed(1)}%</b></span>`).join('');
+  const fs = fixedSum(state);
+  document.querySelectorAll('[data-gamt]').forEach(el => {
+    const g = G.find(x => x.id === el.dataset.gamt), m = Math.max(0, +g?.monthly || 0);
+    el.textContent = m ? `${wonShort(m)}${fs ? ` · 금액 비율 ${pct(m / fs * 100)}` : ''}` : '이 그룹은 매월 사지 않음';
+  });
   const s = targetSum(state);
   $('tgtSum').innerHTML = Math.abs(s - 100) > 0.01
     ? `<span class="warnline">목표 비중 합계 ${s.toFixed(1)}% · 100%로 맞춰 주세요 (지금은 비율로 환산 중)</span>` : '목표 비중 합계 100%';
 }
-function fillSettings() { $('monthly').value = state.monthly ?? ''; monthlyRead(); $('carry').value = state.carry ?? 0; $('bandIn').value = state.band ?? ''; }
+function fillSettings() {
+  const fixed = contribOf(state) === 'fixed';
+  if (fixed) state.monthly = fixedSum(state);
+  $('monthly').value = state.monthly ?? ''; monthlyRead(); $('carry').value = state.carry ?? 0; $('bandIn').value = state.band ?? '';
+  document.querySelectorAll('[data-contrib]').forEach(bn => bn.setAttribute('aria-pressed', bn.dataset.contrib === contribOf(state)));
+  $('monthly').readOnly = fixed;
+  document.querySelectorAll('[data-mstep]').forEach(bn => { bn.hidden = fixed; });
+  $('monthlyField').querySelector('label').firstChild.textContent = fixed ? '월 적립금 (그룹별 금액 합계) ' : '월 적립금 (원) ';
+  $('contribHint').textContent = fixed
+    ? '그룹마다 정한 금액으로 매달 같은 종목을 삽니다(아래 그룹 카드의 "매월" 칸). 1주 단위로 끊고 남은 돈은 덜 산 그룹부터 채우고, 그래도 남으면 이월됩니다. 비중은 정기 리밸런싱 때 목표로 맞춥니다.'
+    : '매달 적립금으로 목표 비중보다 부족한 종목부터 채웁니다. 사는 종목이 달마다 바뀌고, 매도 없이 목표에 가까워집니다.';
+}
+$('contribSeg').addEventListener('click', e => {
+  const c = e.target.closest('[data-contrib]')?.dataset.contrib; if (!c || c === contribOf(state)) return;
+  state.contrib = c;
+  if (c === 'fixed' && !fixedSum(state)) {
+    // 처음 바꿀 때는 지금 월 적립금을 목표 비중대로 나눠 채워 둔다(1만 원 단위). 그룹 카드에서 고치면 된다.
+    const live = state.groups.filter(g => members(g).length), tsum = live.reduce((x, g) => x + (+g.target || 0), 0), m = +state.monthly || 0;
+    live.forEach(g => { g.monthly = tsum ? Math.round(m * (+g.target || 0) / tsum / 10000) * 10000 : 0; });
+  }
+  fillSettings(); renderTargets(); renderBoard(); edited();
+});
 
 function changed(structural) {
   if (structural) { renderAssets(); renderTargets(); } else { refreshAssetMeta(); renderTargetMeta(); }
@@ -503,6 +535,10 @@ $('targets').addEventListener('input', e => {
     const g = state.groups.find(x => x.id === grp.dataset.g); if (!g) return;
     if (t.dataset.gk === 'name') { g.name = t.value; document.querySelectorAll('#targets select[data-move] option').forEach(o => { if (o.value === g.id) o.textContent = g.name; }); }
     else g.target = Math.max(0, +t.value || 0);
+  } else if (grp && t.dataset.gk === 'monthly') {
+    const g = state.groups.find(x => x.id === grp.dataset.g); if (!g) return;
+    g.monthly = Math.max(0, Math.round(+t.value || 0));
+    state.monthly = fixedSum(state); $('monthly').value = state.monthly; monthlyRead();
   } else return;
   renderTargetMeta(); renderBoard(); edited();
 });
