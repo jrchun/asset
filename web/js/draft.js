@@ -67,10 +67,10 @@ export function draftTrades(rows, assets, { fx = 0, budget = 0 } = {}) {
 
 // 정기 리밸런싱 주기: 리밸런싱하는 달(1~12)
 export const CYCLES = { quarter: { label: '분기', months: [1, 4, 7, 10] }, half: { label: '반기', months: [1, 7] }, year: { label: '연 1회', months: [1] } };
-export const cycleOf = doc => (CYCLES[doc?.cycle] ? doc.cycle : 'quarter');
+export const cycleOf = doc => (CYCLES[doc?.cycle] ? doc.cycle : 'year');
 // 이번 달이 리밸런싱하는 달인지와 다음 예정 달. month는 1~12.
 export function rebalanceSchedule(cycle, year, month) {
-  const ms = (CYCLES[cycle] || CYCLES.quarter).months;
+  const ms = (CYCLES[cycle] || CYCLES.year).months;
   const due = ms.includes(month);
   const after = ms.find(m => m > month);
   const next = after ? { year, month: after } : { year: year + 1, month: ms[0] };

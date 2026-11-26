@@ -175,3 +175,41 @@ test('영업일 계산과 월말 기록', () => {
   assert.equal(Math.round(snap.groups.reduce((x, g) => x + g.weight, 0)), 100);
   assert.equal(Math.round(snap.total), Math.round(snap.assets.reduce((x, a) => x + a.value, 0)));
 });
+
+test('그룹별 정액 적립(fixed): 그룹 금액대로 사고, 남은 돈은 덜 산 단위부터', () => {
+  const doc = {
+    contrib: 'fixed', monthly: 0, carry: 5000, band: 5,
+    groups: [
+      { id: 'nq', name: '나스닥', target: 70, mode: 'lead', lead: 'A', sell: 'A', monthly: 100000 },
+      { id: 'kr', name: '국내', target: 20, mode: 'ratio', monthly: 30000 },
+      { id: 'bt', name: '코인', target: 10, mode: 'ratio', monthly: 10000 },
+    ],
+    assets: [
+      { name: 'A', ticker: 'A', market: 'KR', qty: 10, avg: 1, unit: 1, group: 'nq' },
+      { name: 'A2', ticker: 'A2', market: 'KR', qty: 5, avg: 1, unit: 1, group: 'nq' },
+      { name: 'K1', ticker: 'K1', market: 'KR', qty: 1, avg: 1, unit: 1, group: 'kr', inner: 2 },
+      { name: 'K2', ticker: 'K2', market: 'KR', qty: 1, avg: 1, unit: 1, group: 'kr', inner: 1 },
+      { name: 'BIG', ticker: 'BIG', market: 'KR', qty: 0, avg: 1, unit: 1, group: 'bt' },
+    ],
+  };
+  const prices = { quotes: { A: { close: 30000 }, A2: { close: 1 }, K1: { close: 7000 }, K2: { close: 4000 }, BIG: { close: 50000 } } };
+  const b = computeBoard(doc, prices);
+  assert.equal(b.contrib, 'fixed');
+  assert.equal(b.C, 140000, '적립금 = 그룹 금액 합계(문서의 monthly는 무시)');
+  assert.equal(b.budget, 145000);
+  const rows = buyRows(b);
+  // 나스닥(대표형): 10만 원 → A 3주(9만) / 국내(비율 2:1): K1 2만 원 → 2주, K2 1만 원 → 2주
+  // 코인: 1만 원 < 5만 원 → 보류. 남은 돈 = 이월 5천 + 나머지(1만 + 6천 + 2천 + 1만) = 3.3만 → A 1주 더(덜 산 쪽 1만 원)
+  assert.equal(rows.A.q, 4);
+  assert.equal(rows.K1.q, 2);
+  assert.equal(rows.K2.q, 2);
+  assert.equal(rows.BIG.q, 0);
+  assert.equal(rows.BIG.blocked, true);
+  assert.equal(Math.round(b.plan.spent), 4 * 30000 + 2 * 7000 + 2 * 4000);
+  assert.ok(b.plan.spent <= b.budget);
+});
+
+test('적립 방식 기본값은 부족분 채우기(예전 문서 호환)', () => {
+  const doc = ensureGroups(load('example-portfolio.json'));
+  assert.equal(computeBoard(doc, load('example-prices.json')).contrib, 'deficit');
+});

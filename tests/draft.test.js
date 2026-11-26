@@ -48,6 +48,6 @@ test('정기 리밸런싱 주기: 이번 달 여부와 다음 예정 달', () =>
   assert.deepEqual(rebalanceSchedule('quarter', 2026, 4), { due: true, next: { year: 2026, month: 7 } });
   assert.deepEqual(rebalanceSchedule('half', 2026, 3), { due: false, next: { year: 2026, month: 7 } });
   assert.deepEqual(rebalanceSchedule('year', 2026, 1), { due: true, next: { year: 2027, month: 1 } });
-  assert.equal(cycleOf({}), 'quarter', '정하지 않았으면 분기');
+  assert.equal(cycleOf({}), 'year', '정하지 않았으면 연 1회');
   assert.equal(cycleOf({ cycle: 'half' }), 'half');
 });

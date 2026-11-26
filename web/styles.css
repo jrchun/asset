@@ -422,3 +422,26 @@ details.help p{margin:8px 0 0}
 }
 /* '매수' 표시(.act.buy)가 카드 스타일(.buy)을 물려받지 않게 */
 .act.buy{display:inline-block;padding:1px 8px;border:0;border-radius:4px;background:var(--ok-soft);color:var(--ok);grid-template-columns:none;grid-template-areas:none}
+/* 그룹별 정액 적립: 그룹 카드의 '매월' 칸 */
+.grp-amt{display:flex;gap:6px 10px;align-items:center;flex-wrap:wrap;font-size:.84rem}
+.grp-amt label{color:var(--muted);font-weight:500}
+.grp-amt .tgt-in{width:9rem}
+.tgt-in.won::after{content:"원"}
+.tgt-in.won input{padding-right:30px}
+.grp-amt .note{flex-basis:auto}
+#monthly[readonly]{background:var(--sunk);color:var(--muted)}
+/* 살 것이 6줄이어도 폰 한 화면에 들어가게 */
+@media (max-width:520px){
+  .buy-lines li{padding:3px 0;font-size:.84rem}
+  .mx-h{display:none!important}
+  .gl-total .v{font-size:1.2rem}
+  .glance,#secMonthly{padding:10px 14px}
+  #board{gap:10px}
+  .wrap{gap:10px}
+  #secMonthly .panel-head h2{font-size:1rem}
+  .buy-foot{padding-top:2px}
+}
+/* 상태 칸은 항상 오른쪽(손익 줄이 길면 왼쪽 글자가 줄바꿈) */
+.gl-top{flex-wrap:nowrap}
+.gl-total{flex:1 1 auto}
+.gl-st{flex:0 0 auto;max-width:45%}

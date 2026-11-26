@@ -65,6 +65,43 @@ export function planMonthly(UA, vals, w, budget, prices) {
   return { raw, q, amt, spent, blocked, price };
 }
 
+// 그룹별 정액 적립: 그룹마다 정한 매월 금액(g.monthly)을 그 그룹 단위들에 나눈다(대표형은 대표 종목, 비율형은 그룹 내 비율대로).
+// 단위별로 매매 단위에 맞춰 내림 → 남은 돈(내림 나머지 + 이월 현금)으로 '배정액 대비 덜 산' 단위부터 1매매단위씩 더 산다.
+export function planFixed(units, UA, carry, prices) {
+  const n = UA.length, price = UA.map(a => krwPrice(prices, a)), unit = UA.map(unitOfAsset);
+  const byG = new Map();
+  units.forEach((u, i) => { if (u.g) { if (!byG.has(u.g.id)) byG.set(u.g.id, []); byG.get(u.g.id).push(i); } });
+  const raw = units.map(() => 0);
+  for (const idx of byG.values()) {
+    const g = units[idx[0]].g, amt = Math.max(0, +g.monthly || 0), S = idx.reduce((x, i) => x + units[i].w, 0);
+    idx.forEach(i => { raw[i] = amt * (S > 0 ? units[i].w / S : 1 / idx.length); });
+  }
+  const q = raw.map((x, i) => price[i] > 0 ? floorTo(x / price[i], unit[i]) : 0);
+  const amtOf = i => q[i] * price[i];
+  let pool = Math.max(0, +carry || 0) + raw.reduce((x, r, i) => x + r - amtOf(i), 0);
+  for (let guard = 0; guard < 500; guard++) {
+    let best = -1, bestGap = -Infinity;
+    for (let i = 0; i < n; i++) {
+      const step = unit[i] * price[i];
+      if (!(price[i] > 0) || !(raw[i] > 0) || step > pool + 1e-6) continue;
+      const gap = raw[i] - amtOf(i);
+      if (gap > bestGap) { bestGap = gap; best = i; }
+    }
+    if (best < 0) break;
+    q[best] = +(q[best] + unit[best]).toFixed(8); pool -= unit[best] * price[best];
+  }
+  const amt = q.map((x, i) => x * price[i]);
+  const blocked = raw.map((x, i) => x >= 1 && q[i] <= 0);
+  return { raw, q, amt, spent: amt.reduce((x, y) => x + y, 0), blocked, price };
+}
+// 적립 방식: 'fixed' = 그룹별 정액, 'deficit' = 부족분 채우기(기본, 예전 문서)
+export const contribOf = doc => (doc?.contrib === 'fixed' ? 'fixed' : 'deficit');
+// 그룹별 정액 합계(종목이 있는 그룹만)
+export function fixedSum(doc) {
+  const A = (doc.assets || []).filter(a => !a.exclude);
+  return (doc.groups || []).filter(g => A.some(a => a.group === g.id)).reduce((x, g) => x + Math.max(0, +g.monthly || 0), 0);
+}
+
 export function statusOf(md, band) {
   return md <= band / 2 ? 'ok' : md <= band ? 'warn' : 'bad';
 }
@@ -158,7 +195,8 @@ export function computeBoard(doc, prices) {
   const vals = A.map(a => (+a.qty || 0) * krwPrice(prices, a));
   const cost = A.map(a => (+a.qty || 0) * (+a.avg || 0) * (isUSD(a) ? (fx || 0) : 1));
   const T = vals.reduce((s, v) => s + v, 0), TC = cost.reduce((s, v) => s + v, 0);
-  const C = Math.max(0, +doc.monthly || 0);
+  const contrib = contribOf(doc);
+  const C = contrib === 'fixed' ? fixedSum(doc) : Math.max(0, +doc.monthly || 0);
   const band = Math.max(0.1, +doc.band || 5);
   const { units, live, byG, tSum, loose } = buildUnits(doc.groups, A, vals);
   const uv = units.map(u => u.val), uw = units.map(u => u.w);
@@ -176,7 +214,7 @@ export function computeBoard(doc, prices) {
 
   const carry = Math.max(0, +doc.carry || 0), budget = C + carry;
   const UA = units.map(u => A[u.buy]);
-  const plan = planMonthly(UA, uv, uw, budget, prices);
+  const plan = contrib === 'fixed' ? planFixed(units, UA, carry, prices) : planMonthly(UA, uv, uw, budget, prices);
   const after = uv.map((x, i) => x + plan.amt[i]);
   const T2 = after.reduce((s, x) => s + x, 0);
   const md2 = maxDrift(after, uw);
@@ -189,7 +227,7 @@ export function computeBoard(doc, prices) {
   const unitIndexOf = i => units.findIndex(u => u.idx.includes(i));
 
   return {
-    A, EXA, exVal, vals, cost, T, TC, pl: T - TC, C, band, fx,
+    A, EXA, exVal, vals, cost, T, TC, pl: T - TC, C, band, fx, contrib,
     units, live, byG, tSum, loose, uv, uw, UA,
     missing, stale, needFx, cur, uDrift, md, mdIdx, status, months,
     carry, budget, plan, after, T2, md2, annual, groupRows, unitIndexOf,
